@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 3 of 8. A fixed volume band fires on all eight weekend nights and catches nothing. A same-weekday median catches the partial load with zero false pages. And a duplicate rate catches the one failure that leaves the row count perfectly healthy.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Volume and uniqueness - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 3 of 8. Two monitors that catch two different failures: a seasonal volume comparison and a duplicate rate.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b3-volume-uniqueness.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Volume and uniqueness - learn data observability with phoebe">
+<meta name="twitter:description" content="Eight false pages for zero catches, or zero false pages for the same catch. The comparison is the monitor.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 3 · Volume and uniqueness - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 3 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 3 of 8</div>
+    <h1>Volume and <span class="accent">uniqueness</span></h1>
+    <p class="sub">A row count is the cheapest signal in the warehouse and the easiest one to get wrong, because the number means nothing until you say what you are comparing it against. Tonight you build two monitors out of the same metrics table. The first catches a load that arrived with a third of its data missing. The second catches the failure class where the row count is perfect, freshness is perfect, the pipeline reported success, and every downstream sum is wrong.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · Counting is harder than it looks</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: two monitors, two failures</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Two signals, two failure classes</h2>
+    </div>
+    <p class="lede">The metrics table already stores everything both monitors need: <code class="mono">rows</code> and <code class="mono">distinct_keys</code>, one row per table per night. <strong>analytics.orders_daily</strong> at Bellwether carries about 12,000 rows on a weekday and about 45 percent of that at the weekend, which is the fact that decides the shape of the volume monitor before you write a line of it. Uniqueness is the other half of tonight, and it exists as a separate monitor for one reason: its failure mode is invisible to every other check in the set.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Two working monitors and the measured cost of getting the volume comparison wrong: a fixed plus-or-minus 30 percent band around 12,000 fires on all eight weekend nights in a 30-night window, which is eight false pages for zero catches, while the same-weekday median catches the partial load with zero. Plus the duplicate-rate query that is the only thing in the whole set that sees night 19.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why a row count is not a number<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Twelve thousand rows. Is that fine? There is no answer to that question, and every volume monitor that gets muted was built by somebody who thought there was. The count only becomes a signal once you attach a comparison, and choosing the comparison <em>is</em> the design work. Three candidates come up every time:</p>
+        <ul>
+          <li><strong>A fixed band.</strong> Cheap to write, needs no history, and wrong on any table with a weekly rhythm. Bellwether's is the ordinary case, not an unusual one: grocery delivery is quieter at the weekend and no single band holds both patterns while still being tight enough to catch a missing shard.</li>
+          <li><strong>The same weekday.</strong> Compares Tuesday against Tuesdays. Handles the weekly rhythm exactly, needs four weeks of history to be comfortable, and is the right default for anything driven by human behaviour.</li>
+          <li><strong>A robust band around the median.</strong> For tables with no weekly rhythm at all, where the useful question is only "is tonight unlike the recent past" and you want the estimate not to be dragged around by the incident you are trying to detect.</li>
+        </ul>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's night 16 arrived with one of three source shards missing: 4,920 rows against a same-weekday median of 11,986, which is 59 percent short. The fixed band caught it too. The difference is that the fixed band also paged on eight quiet weekend nights on the way there, and by the time night 16 arrived the on-call had learned to expect the alert.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What each of the two monitors can and cannot see<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Worth being explicit, because the temptation is to think of volume as a general-purpose health check and it is nothing of the kind.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Failure</th><th>Volume sees it</th><th>Uniqueness sees it</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A source shard never arrived</td><td>Yes, the count drops sharply</td><td>No, the surviving rows are clean</td></tr>
+            <tr><td>A merge key changed and rows duplicated</td><td>Only if the net count moves enough</td><td>Yes, directly</td></tr>
+            <tr><td>Duplicates added and other rows dropped</td><td>Frequently not, the two cancel</td><td>Yes, the rate moves regardless</td></tr>
+            <tr><td>The same correct rows loaded twice as a full replay</td><td>Yes, the count roughly doubles</td><td>Yes, every key is now duplicated</td></tr>
+            <tr><td>A column went null across every row</td><td>No, the count is unchanged</td><td>No, unless the key is the null column</td></tr>
+          </tbody>
+        </table>
+        <p>That last row is the honest boundary of tonight: a null-rate collapse leaves both of these monitors green, which is why distribution is a separate signal with its own session.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers fixed bands, same-weekday medians and robust bands</span>
+      <h2>Volume: the comparison is the monitor</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">Plot the series before choosing the comparison. Thirty nights of orders_daily has a rhythm you can see from across the room, and the moment you can see it the fixed band stops looking like a reasonable simplification.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 374" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Thirty nights of row counts for orders_daily as a bar series. Weekday nights sit near 12,000 rows and the eight weekend nights sit near 5,400. A fixed band from 8,400 to 15,600 is drawn across the chart: all eight weekend nights fall below its floor and are marked as false pages. Night 16 is drawn in red at 4,920 rows, with a same-weekday median line at 11,986 above it showing a 59 percent shortfall.">
+        <style>
+          .b3aH { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .b3aB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b3aL { font: 700 11px Inter, sans-serif; fill: #B45309; }
+          .b3aM { font: 700 11px Inter, sans-serif; fill: #075985; }
+          .b3aT { font: 400 10px Inter, sans-serif; fill: #55697A; }
+          .b3aR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .b3aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b3aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#991B1B"></path>
+          </marker>
+        </defs>
+
+        <text class="b3aH" x="14" y="22">Thirty nights of row counts on analytics.orders_daily</text>
+        <text class="b3aB" x="14" y="38">weekday about 12,000 rows; the weekend is about 45 percent of that</text>
+
+        <rect x="14" y="46" width="12" height="12" rx="3" fill="#0369A1"></rect>
+        <text class="b3aB" x="32" y="56">weekday</text>
+        <rect x="96" y="46" width="12" height="12" rx="3" fill="#BAE6FD"></rect>
+        <text class="b3aB" x="114" y="56">weekend</text>
+        <rect x="178" y="46" width="12" height="12" rx="3" fill="#991B1B"></rect>
+        <text class="b3aB" x="196" y="56">night 16, partial load</text>
+        <line x1="370" y1="52" x2="398" y2="52" stroke="#B45309" stroke-width="2" stroke-dasharray="5 4"></line>
+        <text class="b3aB" x="406" y="56">fixed band, 8,400 to 15,600</text>
+        <line x1="615" y1="52" x2="643" y2="52" stroke="#075985" stroke-width="2" stroke-dasharray="5 4"></line>
+        <text class="b3aB" x="651" y="56">same-weekday median</text>
+
+        <line x1="55" y1="85.5" x2="855" y2="85.5" stroke="#B45309" stroke-width="1.5" stroke-dasharray="5 4"></line>
+        <text class="b3aL" x="14" y="80">fixed ceiling 15,600</text>
+        <line x1="55" y1="184.5" x2="855" y2="184.5" stroke="#B45309" stroke-width="1.5" stroke-dasharray="5 4"></line>
+        <text class="b3aL" x="855" y="178" text-anchor="end">fixed floor 8,400</text>
+
+        <rect x="60" y="138.3" width="18" height="161.7" rx="2" fill="#0369A1"></rect>
+        <rect x="86.3" y="135.4" width="18" height="164.6" rx="2" fill="#0369A1"></rect>
+        <rect x="112.6" y="139.7" width="18" height="160.3" rx="2" fill="#0369A1"></rect>
+        <rect x="138.9" y="131.3" width="18" height="168.7" rx="2" fill="#0369A1"></rect>
+        <rect x="165.2" y="126.3" width="18" height="173.7" rx="2" fill="#0369A1"></rect>
+        <rect x="191.5" y="222.4" width="18" height="77.6" rx="2" fill="#BAE6FD"></rect>
+        <rect x="217.8" y="225.1" width="18" height="74.9" rx="2" fill="#BAE6FD"></rect>
+        <rect x="244.1" y="141.9" width="18" height="158.1" rx="2" fill="#0369A1"></rect>
+        <rect x="270.4" y="135" width="18" height="165" rx="2" fill="#0369A1"></rect>
+        <rect x="296.7" y="133.2" width="18" height="166.8" rx="2" fill="#0369A1"></rect>
+        <rect x="323" y="129.1" width="18" height="170.9" rx="2" fill="#0369A1"></rect>
+        <rect x="349.3" y="127" width="18" height="173" rx="2" fill="#0369A1"></rect>
+        <rect x="375.6" y="228.5" width="18" height="71.5" rx="2" fill="#BAE6FD"></rect>
+        <rect x="401.9" y="223.7" width="18" height="76.3" rx="2" fill="#BAE6FD"></rect>
+        <rect x="428.2" y="126.5" width="18" height="173.5" rx="2" fill="#0369A1"></rect>
+        <rect x="454.5" y="232.4" width="18" height="67.6" rx="2" fill="#991B1B"></rect>
+        <rect x="480.8" y="144.3" width="18" height="155.7" rx="2" fill="#0369A1"></rect>
+        <rect x="507.1" y="130.1" width="18" height="169.9" rx="2" fill="#0369A1"></rect>
+        <rect x="533.4" y="135" width="18" height="165" rx="2" fill="#0369A1"></rect>
+        <rect x="559.7" y="227.2" width="18" height="72.8" rx="2" fill="#BAE6FD"></rect>
+        <rect x="586" y="221.6" width="18" height="78.4" rx="2" fill="#BAE6FD"></rect>
+        <rect x="612.3" y="130.5" width="18" height="169.5" rx="2" fill="#0369A1"></rect>
+        <rect x="638.6" y="135" width="18" height="165" rx="2" fill="#0369A1"></rect>
+        <rect x="664.9" y="130.5" width="18" height="169.5" rx="2" fill="#0369A1"></rect>
+        <rect x="691.2" y="135" width="18" height="165" rx="2" fill="#0369A1"></rect>
+        <rect x="717.5" y="128.8" width="18" height="171.2" rx="2" fill="#0369A1"></rect>
+        <rect x="743.8" y="225.8" width="18" height="74.2" rx="2" fill="#BAE6FD"></rect>
+        <rect x="770.1" y="224.7" width="18" height="75.3" rx="2" fill="#BAE6FD"></rect>
+        <rect x="796.4" y="131.1" width="18" height="168.9" rx="2" fill="#0369A1"></rect>
+        <rect x="822.7" y="136.8" width="18" height="163.2" rx="2" fill="#0369A1"></rect>
+
+        <line x1="86.3" y1="135.2" x2="472.5" y2="135.2" stroke="#075985" stroke-width="2" stroke-dasharray="6 4"></line>
+        <circle cx="95.3" cy="135.4" r="4" fill="#075985"></circle>
+        <circle cx="279.4" cy="135" r="4" fill="#075985"></circle>
+        <line x1="463.5" y1="139" x2="463.5" y2="226" stroke="#991B1B" stroke-width="2" marker-end="url(#b3aAr)"></line>
+
+        <rect x="596" y="90" width="254" height="36" rx="8" fill="#fff" stroke="#C3D4E0"></rect>
+        <text class="b3aR" x="608" y="106">night 16: 4,920 rows vs</text>
+        <text class="b3aR" x="608" y="121">median 11,986 = -59 percent</text>
+
+        <line x1="55" y1="300" x2="855" y2="300" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <text class="b3aT" x="69" y="314" text-anchor="middle">1</text>
+        <text class="b3aT" x="174.2" y="314" text-anchor="middle">5</text>
+        <text class="b3aT" x="305.7" y="314" text-anchor="middle">10</text>
+        <text class="b3aT" x="437.2" y="314" text-anchor="middle">15</text>
+        <text class="b3aT" x="568.7" y="314" text-anchor="middle">20</text>
+        <text class="b3aT" x="700.2" y="314" text-anchor="middle">25</text>
+        <text class="b3aT" x="831.7" y="314" text-anchor="middle">30</text>
+
+        <rect x="197" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="223.3" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="381.1" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="407.4" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="565.2" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="591.5" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="749.3" y="320" width="7" height="7" fill="#B45309"></rect>
+        <rect x="775.6" y="320" width="7" height="7" fill="#B45309"></rect>
+        <text class="b3aB" x="14" y="340">each amber square is a false page from the fixed band</text>
+
+        <rect x="14" y="352" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b3aN" x="38" y="363">The fixed band pages on 8 weekend nights and catches nothing extra for them.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the rhythm is visible from across the room, and the fixed band ignores it.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The fixed band, priced properly<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The band is 12,000 plus or minus 30 percent, so a floor of 8,400 and a ceiling of 15,600. A weekend night at about 5,400 rows is not near that floor, it is 36 percent below it, so every weekend night is an alert by construction. In a 30-night window that is <strong>eight false pages</strong>, and they buy nothing: night 16 at 4,920 rows is caught by the same-weekday comparison too.</p>
+        <p>Widening the band does not rescue it. To hold a weekend night inside the band you need a floor below 5,200, which means a band of roughly plus or minus 57 percent around 12,000, and a weekday night can then lose 6,000 rows without a peep. That is the trade in its clearest form: a band wide enough to be quiet is too wide to detect the thing you built it for.</p>
+        <div class="callout tip">
+          <p><strong>The tell that you have the wrong comparison.</strong> Your false pages cluster. If every alert lands on a Saturday, or at month end, or on the first working day after a holiday, the monitor has discovered a real pattern in your business and is reporting it as a fault. Move the pattern into the comparison rather than into an exclusion list.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The same-weekday median, and why median<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Compare tonight against the median of the last four <em>same weekdays</em>, and alert outside plus or minus 25 percent. On Bellwether's history that monitor produces <strong>zero false pages in 30 nights</strong> and catches night 16 with the sentence <code class="mono">4920 rows vs a same-weekday median of 11986, -59 percent</code>, which is a message somebody can act on without opening anything.</p>
+        <p>Median rather than mean, for a reason that matters more than it sounds. Your history contains the incidents you are trying to detect. A mean of four values is moved by roughly a quarter of any outlier in the window, so the night after a partial load your comparison point has dropped and your threshold has quietly loosened exactly when you need it tight. A median of four values is unmoved by one outlier at either extreme. The property you want in a monitor is that a past incident does not raise the bar for detecting the next one.</p>
+        <ul>
+          <li><strong>Four same weekdays</strong> is four weeks of calendar, which is long enough to be stable and short enough that a real change in the business washes through within a month.</li>
+          <li><strong>Twenty-five percent</strong> is wide enough to absorb ordinary week-to-week movement on this table and tight enough that a missing shard of any size clears it. Set yours from your own spread, not from this page.</li>
+          <li><strong>Both directions.</strong> A count 40 percent above the median is a duplicate replay or a backfill running into today's partition. Firing only on the low side is the most common half-built volume monitor.</li>
+          <li><strong>Guard the cold start.</strong> With fewer than two same weekdays in history the monitor must return "not enough history" rather than a comparison against one night.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Robust bands with MAD, for tables with no rhythm<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Plenty of tables have no weekly pattern: a machine-generated event stream, a reference table, a slowly growing dimension. There the same-weekday comparison throws away three quarters of your history for nothing, and what you want is a band around the recent median that is not dragged around by outliers.</p>
+        <p>Median absolute deviation is the standard tool. Take the median of the series, take the absolute deviation of every point from it, take the median of those. Multiply by 1.4826 and you have a robust stand-in for a standard deviation on roughly normal data, which lets you keep thinking in familiar multiples.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with m as (
+  select rows
+  from analytics.obs_metrics
+  where table_name = 'analytics.orders_daily'
+    and load_date &gt;= current_date - 30
+),
+c as (
+  select percentile_disc(0.5) within group (order by rows) as med
+  from m
+)
+select c.med,
+       percentile_disc(0.5) within group (order by abs(m.rows - c.med)) as mad,
+       1.4826 * percentile_disc(0.5) within group (order by abs(m.rows - c.med)) as sd_robust
+from m cross join c
+group by c.med;
+        </div>
+        <p>Then band at the median plus or minus three times <code class="mono">sd_robust</code>. Two cautions. On a strongly seasonal table this is the wrong tool and will simply widen until it holds the weekend, so check for rhythm first. And on a table with genuinely tiny variance the MAD can collapse towards zero, which makes the band absurdly tight; floor it at some absolute minimum that means something in the units of the table, exactly as a percentage floor is used on a null-rate monitor.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>The failure this avoids is well worth seeing once. Set a mean-plus-3sd band on 30 nights that include one 60-percent-short night, and the outlier both drops the mean and inflates the standard deviation, so the lower bound moves down twice. The band that was supposed to be tightened by the incident is wider afterwards than it was before.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers duplicate rate, grain and the dual failure</span>
+      <h2>Uniqueness: the failure that leaves the row count healthy</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">On Bellwether's night 19 a merge key changed upstream. The duplicate rate went from 1.0 to 8.4 percent and the row count stayed normal, so the pipeline reported success, the freshness check passed and the volume monitor passed. Nothing in the set saw it except a rate that nobody had built yet.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Night 19 shown as three panels. Row count is 12,000 on a typical night and 12,000 on night 19, so the check passes. Distinct keys drop from about 11,880 to 10,992 on a scale that starts at 10,800. Duplicate rate jumps from 1.0 percent to 8.4 percent and fires against a 2.0 percent limit. Below, pipeline success, freshness and volume all pass while the duplicate rate is the only monitor that fires.">
+        <style>
+          .b3bH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b3bB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b3bV { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .b3bR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .b3bT { font: 400 10px Inter, sans-serif; fill: #55697A; }
+          .b3bP { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .b3bW { font: 700 11px Inter, sans-serif; fill: #fff; }
+          .b3bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="b3bH" x="14" y="24">Night 19: a merge key changed upstream</text>
+
+        <rect x="14" y="40" width="270" height="230" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b3bH" x="30" y="66">Row count</text>
+        <text class="b3bB" x="30" y="84">count(*)</text>
+        <text class="b3bB" x="30" y="100">the number everybody checks</text>
+        <rect x="64" y="126" width="54" height="92" rx="3" fill="#BAE6FD"></rect>
+        <rect x="164" y="126" width="54" height="92" rx="3" fill="#0369A1"></rect>
+        <text class="b3bV" x="91" y="118" text-anchor="middle">12,000</text>
+        <text class="b3bV" x="191" y="118" text-anchor="middle">12,000</text>
+        <text class="b3bT" x="91" y="234" text-anchor="middle">typical night</text>
+        <text class="b3bT" x="191" y="234" text-anchor="middle">night 19</text>
+        <rect x="30" y="240" width="238" height="24" rx="8" fill="#BAE6FD"></rect>
+        <text class="b3bP" x="149" y="256" text-anchor="middle">passes, looks normal</text>
+
+        <rect x="305" y="40" width="270" height="230" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b3bH" x="321" y="66">Distinct keys</text>
+        <text class="b3bB" x="321" y="84">count(distinct order_id)</text>
+        <text class="b3bB" x="321" y="100">scale starts at 10,800</text>
+        <rect x="355" y="147" width="54" height="71" rx="3" fill="#BAE6FD"></rect>
+        <rect x="455" y="205" width="54" height="13" rx="3" fill="#0369A1"></rect>
+        <text class="b3bV" x="382" y="139" text-anchor="middle">11,880</text>
+        <text class="b3bV" x="482" y="197" text-anchor="middle">10,992</text>
+        <text class="b3bT" x="382" y="234" text-anchor="middle">typical night</text>
+        <text class="b3bT" x="482" y="234" text-anchor="middle">night 19</text>
+        <rect x="321" y="240" width="238" height="24" rx="8" fill="#BAE6FD"></rect>
+        <text class="b3bP" x="440" y="256" text-anchor="middle">888 keys short, no rule broken</text>
+
+        <rect x="596" y="40" width="270" height="230" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b3bH" x="612" y="66">Duplicate rate</text>
+        <text class="b3bB" x="612" y="84">1 - distinct(key)/count(*)</text>
+        <text class="b3bB" x="612" y="100">limit from history: 2.0 percent</text>
+        <rect x="646" y="208" width="54" height="10" rx="3" fill="#BAE6FD"></rect>
+        <rect x="746" y="132" width="54" height="86" rx="3" fill="#991B1B"></rect>
+        <text class="b3bV" x="673" y="200" text-anchor="middle">1.0 percent</text>
+        <text class="b3bR" x="773" y="124" text-anchor="middle">8.4 percent</text>
+        <text class="b3bT" x="673" y="234" text-anchor="middle">typical night</text>
+        <text class="b3bT" x="773" y="234" text-anchor="middle">night 19</text>
+        <rect x="612" y="240" width="238" height="24" rx="8" fill="#991B1B"></rect>
+        <text class="b3bW" x="731" y="256" text-anchor="middle">fires, 8.4 against a 2.0 limit</text>
+
+        <rect x="14" y="282" width="196" height="24" rx="12" fill="#BAE6FD"></rect>
+        <text class="b3bP" x="112" y="298" text-anchor="middle">pipeline success: pass</text>
+        <rect x="222" y="282" width="196" height="24" rx="12" fill="#BAE6FD"></rect>
+        <text class="b3bP" x="320" y="298" text-anchor="middle">freshness: pass</text>
+        <rect x="430" y="282" width="196" height="24" rx="12" fill="#BAE6FD"></rect>
+        <text class="b3bP" x="528" y="298" text-anchor="middle">volume: pass</text>
+        <rect x="638" y="282" width="228" height="24" rx="12" fill="#991B1B"></rect>
+        <text class="b3bW" x="752" y="298" text-anchor="middle">duplicate rate: fires</text>
+
+        <rect x="14" y="314" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b3bN" x="38" y="325">A normal row count is what makes a dedup failure silent. Only the rate sees it.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - three panels, one failure, and only the third monitor notices.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>A rate, not an assertion<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The duplicate rate is <code class="mono">1 - count(distinct key) / count(*)</code>, and on a large table it is a better monitor than a hard uniqueness assertion for three reasons that all show up in the first month.</p>
+        <ul>
+          <li><strong>It degrades gracefully.</strong> A hard assertion has two states. A rate has a history, so you can see 0.6 percent creeping to 1.4 percent over a fortnight and fix the cause before it is an incident. A pass-or-fail check gives you no warning at all and then a build failure.</li>
+          <li><strong>It gives you a sentence.</strong> "Duplicate rate 8.4 percent against a limit of 2.0, up from 1.0 last night" is a message that survives being forwarded to somebody who does not know the table. "unique_order_id failed" is a message that requires a query before anybody can act.</li>
+          <li><strong>It tolerates a known floor.</strong> Many real tables have a small, understood duplicate population: a replayed event, a soft-deleted row, a late correction. A hard assertion on such a table is either disabled or wrapped in an exclusion list that nobody maintains. A rate lets you set the threshold above the known floor and monitor the deviation from it.</li>
+        </ul>
+        <p>Set the threshold from the history, the way you set the freshness threshold. On this table the clean nights sit between about 0.6 and 1.4 percent, so a 2.0 percent limit is above every clean night and far below the 8.4 percent of the incident. It fires once in 30 nights and that once is night 19.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Composite keys and the grain question<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>This is where most duplicate monitors are actually wrong, and the error is invisible because the monitor is green. Before you can measure uniqueness you have to answer one question about the table: <strong>what is one row?</strong> One order? One order line? One order line per warehouse per day? A duplicate monitor is only meaningful against the declared grain, and if the grain in your head differs from the grain in the table, the monitor measures nothing.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select count(*)                                            as rows,
+       count(distinct order_id)                            as distinct_orders,
+       count(distinct order_id || '|' || coalesce(status, '~')) as distinct_grain,
+       1 - count(distinct order_id) / count(*)::float      as dup_rate_order,
+       1 - count(distinct order_id || '|' || coalesce(status, '~'))
+             / count(*)::float                             as dup_rate_grain
+from analytics.orders_daily
+where load_date = current_date;
+        </div>
+        <p>Run both rates side by side on any table you are unsure about. If <code class="mono">dup_rate_order</code> is 40 percent and <code class="mono">dup_rate_grain</code> is 0, the table is not one row per order and a monitor on <code class="mono">order_id</code> alone would page every single night until somebody muted it. If both are 0, one row is one order and the simple monitor is correct.</p>
+        <ul>
+          <li><strong>Concatenate carefully.</strong> A naive <code class="mono">a || b</code> makes <code class="mono">('ab', 'c')</code> and <code class="mono">('a', 'bc')</code> collide. Use a separator that cannot occur in the values, and coalesce the nulls, or the whole key silently becomes null and the distinct count collapses.</li>
+          <li><strong>Nulls in a key are not distinct in the way you expect.</strong> <code class="mono">count(distinct)</code> ignores nulls entirely, so a key column that is 30 percent null produces a duplicate rate that looks alarming for the wrong reason. Monitor the key's null rate alongside its duplicate rate.</li>
+          <li><strong>Write the grain down next to the table.</strong> One sentence in the model's documentation. This is the single cheapest piece of documentation in a warehouse and the one most often missing.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The dual failure: duplicated and dropped at once<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The nastiest version of this failure is the one where a merge duplicates some rows and drops others, so the net row count barely moves. It is common because it has a single cause: a join key that changed cardinality upstream will both fan out the rows that now match several times and lose the rows that now match nothing.</p>
+        <p>What that does to your monitors is worth spelling out. Volume sees a net change of maybe one percent and passes. Freshness passes. The pipeline passes. The duplicate rate rises, because the fanned-out rows are genuinely duplicated at the declared grain, and it is the only signal that moves enough to cross a threshold.</p>
+        <div class="callout tip">
+          <p><strong>The pair of numbers that identifies it.</strong> Store <code class="mono">rows</code> and <code class="mono">distinct_keys</code> separately, never just the rate. When the rate rises you then want to know which of the two moved: distinct keys falling while rows hold steady is a fan-out, and both falling together is a fan-out plus a drop. That distinction is the difference between a re-run fixing it and a re-run making it worse.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Two monitors that catch two different failures</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Five steps. Build the same-weekday monitor, build the fixed band beside it so you can count its pages yourself rather than take the number on trust, build the duplicate rate, run all three over the history, then write down the evidence for each threshold.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Step 1. The same-weekday median.</strong> Four weeks back gives up to four same weekdays. As with the freshness percentile, a moving median is awkward as a windowed aggregate in portable SQL, so join the metrics table to itself on weekday and date range and aggregate.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with m as (
+  select load_date,
+         extract(dow from load_date) as weekday,
+         rows
+  from analytics.obs_metrics
+  where table_name = 'analytics.orders_daily'
+),
+same_wd as (
+  select m.load_date, m.rows, h.rows as hist_rows
+  from m
+  join m as h
+    on h.weekday = m.weekday
+   and h.load_date &lt; m.load_date
+   and h.load_date &gt;= m.load_date - 28
+)
+select load_date,
+       max(rows)                                            as rows,
+       count(*)                                             as same_weekdays_seen,
+       percentile_disc(0.5) within group (order by hist_rows) as wd_median
+from same_wd
+group by load_date
+order by load_date;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>Step 2. Turn it into a monitor with a tolerance and a cold-start guard.</strong> Save step 1 as a view called <code class="mono">weekday_history</code>. Both directions, 25 percent, and a refusal to compare against a single night of history.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select load_date,
+       rows,
+       wd_median,
+       round((rows - wd_median) * 100.0 / wd_median) as delta_pct,
+       case when same_weekdays_seen &lt; 2                    then 'not enough history'
+            when abs(rows - wd_median) &gt; 0.25 * wd_median  then 'FIRE'
+            else 'ok' end                            as monitor
+from weekday_history
+order by load_date;
+        </div>
+        <p>Night 16 comes out as <code class="mono">4920 rows vs a same-weekday median of 11986, -59 percent</code>. Every other night in the 30 is inside the tolerance, so this monitor costs <strong>zero false pages</strong>.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 3. Build the fixed band beside it and count its pages.</strong> Do not take the eight on trust; the point of running it is that you see which nights they are.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with banded as (
+  select load_date,
+         rows,
+         case when extract(dow from load_date) in (0, 6) then 'weekend'
+              else 'weekday' end as day_type,
+         case when rows &lt; 12000 * 0.70 then 'FIRE low'
+              when rows &gt; 12000 * 1.30 then 'FIRE high'
+              else 'ok' end      as fixed_band
+  from analytics.obs_metrics
+  where table_name = 'analytics.orders_daily'
+)
+select day_type,
+       count(*) as pages
+from banded
+where fixed_band &lt;&gt; 'ok'
+group by day_type
+order by day_type;
+        </div>
+        <p>Two rows come back: weekend, 8 pages, and weekday, 1 page. All eight weekend nights fire, and the single weekday page is night 16, which the same-weekday monitor also caught. <strong>Eight false pages for zero additional catches</strong>, in one query you can show anybody. Drop the <code class="mono">group by</code> and read the night numbers if you want to see them individually.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 4. The duplicate rate.</strong> Straight out of the two columns the metrics table already stores, with a threshold set above every clean night.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select load_date,
+       rows,
+       distinct_keys,
+       round((1 - distinct_keys / rows::float) * 100, 1) as dup_rate_pct,
+       case when 1 - distinct_keys / rows::float &gt; 0.02 then 'FIRE'
+            else 'ok' end                                as monitor
+from analytics.obs_metrics
+where table_name = 'analytics.orders_daily'
+order by load_date;
+        </div>
+        <p>One night fires: night 19, at <strong>8.4 percent against a 2.0 percent limit</strong>, up from 1.0 percent. Look at that night's other columns while you are there. Rows are normal, lateness is normal, the column count is unchanged. This is the whole argument for uniqueness being its own monitor rather than a footnote on volume.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 5. Run all three over the full history together.</strong> Same-weekday volume: 1 catch, 0 false pages. Fixed band: 1 catch, 8 false pages. Duplicate rate: 1 catch, 0 false pages. Two monitors, two catches, no noise, and one alternative version of the volume monitor that costs eight pages for nothing.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 6. Write the evidence line for each threshold.</strong> Four fields: the comparison, the tolerance, the widest clean deviation in your history, and the pages it would have sent. For this table: same weekday median, 25 percent, widest clean deviation well inside it, zero pages. Duplicate rate, 2.0 percent, clean nights between 0.6 and 1.4 percent, one page and it was real.</p>
+        <p>That line is what makes a threshold reviewable. A threshold with no recorded evidence is indistinguishable from a threshold somebody invented, and after two staff changes there is nobody left who can tell you which one it was.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>Set thresholds from history, not from a feeling.</strong> Every number on this page came out of a query over recorded nights: 25 percent because the clean deviations are far inside it, 2.0 percent because the clean nights top out at 1.4. If you cannot produce the query that justifies a threshold, you have a preference rather than a monitor, and preferences do not survive their first argument at 07:00.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 4</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Plot 30 nights of row counts for your table and say out loud whether it has a weekly rhythm. That single answer picks between the same-weekday median and a robust MAD band, and it takes one chart.</li>
+      <li>Backtest whichever you picked over the history you have and count the pages. If it would have fired more than about once a week, the tolerance is wrong, not the method.</li>
+      <li>Answer the grain question in writing for one table: what is one row? Then run the two duplicate rates side by side and check that the answer in your head matches the answer in the data.</li>
+      <li>Put the duplicate-rate monitor on the key of that table with a threshold above every clean night in your recorded history, and note the highest clean value you saw.</li>
+      <li>Check whether your metrics table stores <code class="mono">rows</code> and <code class="mono">distinct_keys</code> as separate columns rather than only the derived rate. If it stores only the rate, fix that tonight; the missing count is the one you will want during an incident.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Bellwether's weekend volume is about 45 percent of a weekday. A fixed plus-or-minus 30 percent band around 12,000 rows runs over a 30-night window. What does it cost?</p>
+      <button class="qopt" type="button">A · Two false pages, on the two weekend nights furthest from the average</button>
+      <button class="qopt" type="button">B · Eight false pages, one on every weekend night, for zero catches the same-weekday comparison did not also get</button>
+      <button class="qopt" type="button">C · Nothing, because a 30 percent band is wide enough to hold both patterns</button>
+      <p class="qwhy">The floor is 8,400 and a weekend night is about 5,400, which is 36 percent below it, so every weekend night alerts by construction. Night 16 is caught by the same-weekday median too, so the eight pages buy nothing.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Why compare against the median of the last four same weekdays rather than the mean of them?</p>
+      <button class="qopt" type="button">A · The median is cheaper to compute, which matters on a large table</button>
+      <button class="qopt" type="button">B · The mean cannot be computed when the window has an even number of values</button>
+      <button class="qopt" type="button">C · The history contains the incidents you are detecting, and one outlier moves a four-value mean by about a quarter of itself while leaving the median unchanged</button>
+      <p class="qwhy">After a partial load, a mean-based comparison point has dropped, so the threshold has loosened exactly when you need it tight. A past incident must not raise the bar for detecting the next one.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">On night 19 a merge key changed upstream. The duplicate rate went from 1.0 to 8.4 percent and the row count stayed normal. Which checks pass?</p>
+      <button class="qopt" type="button">A · Pipeline success, freshness and volume all pass, and only the duplicate rate fires</button>
+      <button class="qopt" type="button">B · Volume fires, because duplicated rows always raise the count above the tolerance</button>
+      <button class="qopt" type="button">C · Freshness fires, because a merge that fans out takes longer to run</button>
+      <p class="qwhy">A key change can duplicate some rows and drop others, landing within a percent of a normal night. That is the failure class uniqueness exists for, and it is why the rate is stored separately from the count.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Same-weekday medians as a seasonal volume threshold</span>
+        <span class="note">The window length, the tolerance, both directions, the cold-start guard, and the fixed band priced beside it at eight false pages.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Robust bands with median absolute deviation</span>
+        <span class="note">For tables with no weekly rhythm, including the 1.4826 scaling, the collapsing-variance trap and why the median beats the mean on a history containing incidents.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Duplicate rate versus a hard uniqueness assertion</span>
+        <span class="note">Graceful degradation, the message it produces, the known-duplicate floor, composite keys and the grain question, and the dual failure that moves the net count barely at all.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Statistical and machine-learning anomaly detectors</span>
+        <span class="note">Percentiles, medians and MAD used here as thresholds on metadata. Seasonal decomposition, isolation forests, one-class models and the rest belong to learn-anomaly-detection-with-phoebe.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Scoring the two monitors against a full history</span>
+        <span class="note">Counted here by hand over 30 nights. Session 8 runs the whole set and prints catches, false pages and hours to detect together.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Build-time uniqueness assertions in a transform project</span>
+        <span class="note">Not covered by design. A pass-or-fail test on data you produce is a different discipline; that is what the analytics engineering track is for.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 3 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The comparison is the monitor</b><span>A row count means nothing alone. Choosing what it is compared against is the whole design decision.</span></div>
+      <div class="cheat-item"><b>Fixed band, priced</b><span>12,000 plus or minus 30 percent: 8 weekend false pages in 30 nights, zero catches the weekday median missed.</span></div>
+      <div class="cheat-item"><b>Same-weekday median</b><span>Last 4 same weekdays, plus or minus 25 percent, both directions. Night 16: 4,920 vs 11,986, -59 percent, 0 false pages.</span></div>
+      <div class="cheat-item"><b>Median, not mean</b><span>Your history holds the incidents. A mean-based comparison loosens the threshold right after one.</span></div>
+      <div class="cheat-item"><b>MAD for rhythmless tables</b><span>Median of absolute deviations, times 1.4826, band at 3 of those. Floor it or tiny variance makes it absurd.</span></div>
+      <div class="cheat-item"><b>Duplicate rate</b><span>1 - distinct(key)/count(*). Degrades gracefully, gives you a sentence, tolerates a known floor.</span></div>
+      <div class="cheat-item"><b>Answer the grain question</b><span>What is one row? Run the single-key and composite-key rates side by side before trusting either.</span></div>
+      <div class="cheat-item"><b>Night 19</b><span>Dup rate 1.0 to 8.4 percent, row count normal. Pipeline, freshness and volume all pass. Store rows and keys separately.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 3 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b2-freshness.html">← Builder session 2 · Freshness</a>
+      <a href="b4-schema-change.html">Builder session 4 · Schema change →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

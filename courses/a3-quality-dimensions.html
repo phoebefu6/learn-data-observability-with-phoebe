@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 3 of 6. The DAMA-DMBOK six against the fifteen characteristics of ISO/IEC 25012, where the two sets line up, the one dimension that has no standard behind it, and how to get from fifteen to the three you will actually fund.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Quality is a dimension with a number - learn data observability with phoebe">
+<meta property="og:description" content="Leader session 3 of 6. Two published dimension sets, the gap between them, and the three dimensions worth an owner and a target.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/a3-quality-dimensions.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Quality is a dimension with a number - learn data observability with phoebe">
+<meta name="twitter:description" content="Fifteen characteristics, six dimensions, three you can defend. Each survivor needs an owner, a number and a target.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 3 · Quality is a dimension with a number - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Leader session 3 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Leader session 3 of 6</div>
+    <h1>Quality is a dimension with a <span class="accent">number</span></h1>
+    <p class="sub">"Improve data quality" is not a goal, it is a mood. Two published models break quality into named dimensions you can put a target against: the six from DAMA-DMBOK and the fifteen characteristics of ISO/IEC 25012. Tonight you compare them honestly, including the one dimension that has no standard characteristic behind it, and then walk down from fifteen to the three that will get an owner, a number and a date in your plan.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Data and analytics leaders</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-22 · Two published dimension sets</span>
+      <span class="a3" style="flex:4">22-40 · Build-along: pick your three</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>How the leader track works</h2>
+    </div>
+    <p class="lede">Six sessions, 45 minutes each, no SQL, and one artifact you can put in front of whoever funds this: a <strong>one-page trust report</strong> with three numbers on it and a 90-day plan behind it. Session 1 defined data downtime and the discovery gap. Session 2 named the five signals. Tonight is the vocabulary of quality itself, because you cannot fund a target you cannot phrase. Then the cost of a threshold in session 4, coverage without headcount in session 5, and the report itself in session 6. The table running through all six is <strong>orders_daily</strong> at Bellwether, a grocery delivery company whose warehouse holds five real problems that nobody has noticed yet.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> The two dimension sets that every vendor deck quietly borrows from, and the ability to tell which one somebody is using. The honest gap between them, which is one dimension wide and worth knowing before you cite a standard in a steering meeting. And a shortlist of three dimensions for your own top tables, each with a named owner and a number, because a dimension without both is a slide.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why a dimension needs a number before it needs a definition<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Every quality programme that dies quietly dies the same way. Somebody agrees that quality matters, a framework arrives with six or fifteen named dimensions, each dimension gets a paragraph in a document, and eighteen months later nobody can say whether completeness got better or worse. The framework was never the problem. The missing part was a number attached to a dimension, measured the same way twice.</p>
+        <p>So the useful order is backwards from how the documents present it. Start from a decision somebody makes with the data. Ask which dimension, if it broke, would make that decision wrong. Then ask what number would tell you it had broken, and who would see that number. A dimension that survives those three questions is worth funding. A dimension that does not is vocabulary.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's finance team reconciles a daily revenue figure from orders_daily. The dimension that breaks that decision is completeness: on the night a regional shard failed to arrive, the table held 41 percent of a normal same-weekday count and the number was confidently wrong. Accuracy, consistency and validity were all fine that night. Naming completeness as the funded dimension for that one table took ten minutes; naming all six took a quarter and produced nothing measurable.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The four words that do the work tonight<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>Dimension</strong> - a named aspect of what "good" means for a dataset. Completeness, timeliness, uniqueness. It is a definition, not a measurement, and on its own it changes nothing.</li>
+          <li><strong>Measure</strong> - the number that expresses a dimension for one dataset. Null rate on customer_id, minutes past the promised load time, duplicate rate on the order key. One dimension can have several measures, and picking one is a decision somebody has to make and write down.</li>
+          <li><strong>Target</strong> - the value of the measure you are committing to, with a date and an owner. "Under 1 percent by 31 October, owned by Priya." Without all three parts it is an aspiration.</li>
+          <li><strong>Signal</strong> - what gets monitored continuously so that a change is noticed within hours rather than at quarter end. Signals and dimensions are related but they are not the same list, and part 2 is about the difference.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers DAMA-DMBOK, ISO/IEC 25012 and the gap between them</span>
+      <h2>Two published sets, and the gap between them</h2>
+      <span class="tag concept">10 min live</span>
+    </div>
+    <p class="lede">Two models turn up in almost every quality conversation, usually unattributed. DAMA-DMBOK gives six dimensions and is the one most teams have met. ISO/IEC 25012 gives fifteen characteristics and splits them into two views, which is the part people skip and the part that saves you an argument. They agree more than they disagree, and the single place they disagree is worth knowing by name.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The six DAMA-DMBOK dimensions in a left column, connected to the closest ISO/IEC 25012 characteristics in a middle column. Accuracy, completeness and consistency match by name, timeliness matches currentness, validity is closest to compliance and precision, and uniqueness faces an empty box because no ISO characteristic corresponds to it. Credibility has no DAMA equivalent. A right column holds the remaining eight characteristics, which describe the system around the data.">
+        <style>
+          .a3aT { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .a3aH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .a3aI { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .a3aB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .a3aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a3aR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .a3aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="a3aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="a3aH" x="20" y="40">DAMA-DMBOK · six</text>
+        <text class="a3aM" x="20" y="58">the shortlist teams meet first</text>
+        <text class="a3aH" x="390" y="40">ISO/IEC 25012 · 15 total</text>
+        <text class="a3aM" x="390" y="58">inherent view, then near match</text>
+        <text class="a3aH" x="640" y="40">The other eight</text>
+        <text class="a3aM" x="640" y="58">mostly about the system</text>
+
+        <rect x="20" y="76" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="96" text-anchor="middle">Accuracy</text>
+        <rect x="20" y="112" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="132" text-anchor="middle">Completeness</text>
+        <rect x="20" y="148" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="168" text-anchor="middle">Consistency</text>
+        <rect x="20" y="184" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="204" text-anchor="middle">Timeliness</text>
+        <rect x="20" y="220" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="240" text-anchor="middle">Uniqueness</text>
+        <rect x="20" y="256" width="200" height="30" rx="7" fill="#075985"></rect>
+        <text class="a3aT" x="120" y="276" text-anchor="middle">Validity</text>
+
+        <line x1="222" y1="91" x2="386" y2="91" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3aAr)"></line>
+        <line x1="222" y1="127" x2="386" y2="127" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3aAr)"></line>
+        <line x1="222" y1="163" x2="386" y2="163" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3aAr)"></line>
+        <text class="a3aM" x="304" y="86" text-anchor="middle">same name</text>
+
+        <line x1="222" y1="199" x2="386" y2="199" stroke="#C3D4E0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a3aAr)"></line>
+        <text class="a3aM" x="304" y="194" text-anchor="middle">renamed</text>
+
+        <line x1="222" y1="235" x2="386" y2="235" stroke="#991B1B" stroke-width="1.5" stroke-dasharray="3 4"></line>
+        <text class="a3aR" x="304" y="230" text-anchor="middle">no match</text>
+
+        <line x1="222" y1="271" x2="386" y2="271" stroke="#C3D4E0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a3aAr)"></line>
+        <text class="a3aM" x="304" y="266" text-anchor="middle">closest match</text>
+
+        <rect x="390" y="76" width="210" height="30" rx="7" fill="#0369A1"></rect>
+        <text class="a3aT" x="495" y="96" text-anchor="middle">Accuracy</text>
+        <rect x="390" y="112" width="210" height="30" rx="7" fill="#0369A1"></rect>
+        <text class="a3aT" x="495" y="132" text-anchor="middle">Completeness</text>
+        <rect x="390" y="148" width="210" height="30" rx="7" fill="#0369A1"></rect>
+        <text class="a3aT" x="495" y="168" text-anchor="middle">Consistency</text>
+        <rect x="390" y="184" width="210" height="30" rx="7" fill="#0369A1"></rect>
+        <text class="a3aT" x="495" y="204" text-anchor="middle">Currentness</text>
+        <rect x="390" y="220" width="210" height="30" rx="7" fill="#F0F9FF" stroke="#991B1B" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+        <text class="a3aR" x="495" y="240" text-anchor="middle">no ISO characteristic</text>
+        <rect x="390" y="256" width="210" height="30" rx="7" fill="#38BDF8"></rect>
+        <text class="a3aI" x="495" y="276" text-anchor="middle">Compliance, precision</text>
+        <rect x="390" y="292" width="210" height="30" rx="7" fill="#0369A1"></rect>
+        <text class="a3aT" x="495" y="312" text-anchor="middle">Credibility</text>
+        <text class="a3aM" x="382" y="312" text-anchor="end">no DAMA dimension</text>
+
+        <rect x="640" y="76" width="224" height="132" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a3aI" x="656" y="98">Also in both views</text>
+        <text class="a3aB" x="656" y="120">Accessibility</text>
+        <text class="a3aB" x="656" y="140">Confidentiality</text>
+        <text class="a3aB" x="656" y="160">Efficiency</text>
+        <text class="a3aB" x="656" y="180">Traceability</text>
+        <text class="a3aB" x="656" y="200">Understandability</text>
+
+        <rect x="640" y="220" width="224" height="102" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a3aI" x="656" y="242">System-dependent only</text>
+        <text class="a3aB" x="656" y="264">Availability</text>
+        <text class="a3aB" x="656" y="284">Portability</text>
+        <text class="a3aB" x="656" y="304">Recoverability</text>
+
+        <rect x="20" y="342" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a3aN" x="44" y="354">Uniqueness is a DAMA dimension with no ISO characteristic behind it.</text>
+        <text class="a3aM" x="44" y="374">The ISO wording travels through secondary sources; the standard is a paid document.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the two sets agree except in one row, and that row is uniqueness.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The DAMA six, and the decision each one protects<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Six dimensions, six different questions. The reason to learn them as questions rather than as definitions is that the question tells you who complains when it breaks, and that is the person who will pay for the fix.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Dimension</th><th>The question it asks</th><th>What it looks like when it breaks</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Accuracy</td><td>Does the value match the real thing it describes?</td><td>A delivery address that never existed</td></tr>
+            <tr><td>Completeness</td><td>Are the values that should be there present?</td><td>customer_id null on one row in nine</td></tr>
+            <tr><td>Consistency</td><td>Do two places holding the same fact agree?</td><td>The warehouse shows 11,540 orders, the ordering system 11,903</td></tr>
+            <tr><td>Timeliness</td><td>Did it arrive in time to be used?</td><td>The table landed at 09:50 against an 06:00 promise</td></tr>
+            <tr><td>Uniqueness</td><td>Is each real thing represented once?</td><td>One order counted twice after a merge key changed</td></tr>
+            <tr><td>Validity</td><td>Does the value conform to its own rules?</td><td>A postcode with a letter where a digit belongs</td></tr>
+          </tbody>
+        </table>
+        <p>Notice how differently the six behave in practice. Timeliness, completeness and uniqueness have cheap numbers behind them that a warehouse can produce every fifteen minutes. Accuracy usually needs a second system to compare against, which is a project rather than a monitor. That difference matters more to a budget than any definition does.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>ISO/IEC 25012: fifteen characteristics in two views<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The ISO data quality model names fifteen characteristics: accuracy, completeness, consistency, credibility, currentness, accessibility, compliance, confidentiality, efficiency, precision, traceability, understandability, availability, portability and recoverability. The structural idea is the two views. Five of the fifteen sit in the <strong>inherent</strong> view, meaning they are properties of the data itself. Three sit in the <strong>system-dependent</strong> view, meaning they depend on the technology holding the data. The remaining seven appear in both views, because they can be degraded either by the data or by the system around it.</p>
+        <p>A source note worth saying out loud, because somebody will ask where the list came from: the standard itself is a paid document, so the wording of the characteristics as it appears here travels through close secondary summaries rather than the source text. The names and the two-view structure are stable across those summaries. The precise sentences of definition are not something to quote as if read from the original.</p>
+        <div class="callout tip">
+          <p><strong>The two views are the reusable idea.</strong> Availability, portability and recoverability are not really properties of your data at all, they are properties of the application and the environment holding it. Filing them under "data quality" is how a quality programme ends up owning a backup policy. Keep them named, keep them somebody else's, and the scope of your own programme stays defensible.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Where the two sets meet, and the one row where they do not<span class="mini">5 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Line the inherent ISO characteristics up against the DAMA six and the alignment is close. Accuracy, completeness and consistency carry the same name in both. DAMA's timeliness is ISO's currentness, the same question with a different label. DAMA's validity sits closest to compliance and precision, which ISO files in the both-views group rather than as a single inherent characteristic. ISO adds credibility, which has no DAMA counterpart and is a genuinely useful idea: how much the data is believed by the people using it, which is not the same as whether it is right.</p>
+        <p>And then the gap. <strong>Uniqueness has no direct ISO characteristic.</strong> It is a DAMA dimension with nothing corresponding to it in the fifteen. This is not a trick question or a scoring point, it has two practical consequences worth carrying into a meeting:</p>
+        <ul>
+          <li><strong>Do not cite a standard for a uniqueness target.</strong> If somebody asks which standard your duplicate-rate commitment comes from, the honest answer is DAMA's dimension set and your own history, not ISO 25012.</li>
+          <li><strong>Do not drop uniqueness because a standard omits it.</strong> Duplicate failures are the ones that leave a row count looking healthy while every downstream sum is wrong, which makes them the most expensive class to find late. A gap in a model is not evidence about your data.</li>
+          <li><strong>Expect the vendor deck to be a blend.</strong> Most quality tooling markets a list that borrows from both, often with a dimension of its own invention added. Asking which published set a list came from is a fast way to find out how carefully it was assembled.</li>
+        </ul>
+        <p>One more piece of vocabulary that turns up next to confidentiality, since it is the characteristic most likely to pull a quality conversation sideways. Whether the right people can see the data is an access-control question, and the vocabulary of attributes against roles is set out in NIST SP 800-162. Name it and hand it over, because the substance belongs to an access-control practice rather than to a quality measure.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers why three beat six and how a signal differs from a dimension</span>
+      <h2>Measuring all of them badly is the failure mode</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">Nobody fails at data quality by choosing the wrong framework. They fail by adopting a whole framework at once, spreading the available effort across six or fifteen dimensions, and ending the year with fifteen paragraphs and no measurements. Three dimensions with owners beat fifteen with definitions, every time, and the arithmetic of why is not subtle.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 344" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A funnel from fifteen ISO characteristics, to the six DAMA dimensions, to the three dimensions you will actually measure. Each survivor carries three requirements shown as chips: an owner, a number and a target.">
+        <style>
+          .a3bT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .a3bH { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a3bI { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .a3bB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .a3bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a3bW { font: 400 11px Inter, sans-serif; fill: #BAE6FD; }
+          .a3bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="a3bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="a3bH" x="20" y="44">Published models</text>
+        <text class="a3bH" x="520" y="44">Your programme</text>
+
+        <rect x="20" y="60" width="200" height="200" rx="12" fill="#BAE6FD"></rect>
+        <text class="a3bH" x="120" y="154" text-anchor="middle">15 characteristics</text>
+        <text class="a3bM" x="120" y="176" text-anchor="middle">a model to think with</text>
+
+        <rect x="270" y="90" width="200" height="140" rx="12" fill="#38BDF8"></rect>
+        <text class="a3bH" x="370" y="154" text-anchor="middle">6 dimensions</text>
+        <text class="a3bB" x="370" y="176" text-anchor="middle">a shortlist to argue over</text>
+
+        <rect x="520" y="120" width="200" height="80" rx="12" fill="#075985"></rect>
+        <text class="a3bT" x="620" y="154" text-anchor="middle">3 you measure</text>
+        <text class="a3bW" x="620" y="176" text-anchor="middle">funded, with a date</text>
+
+        <line x1="224" y1="160" x2="266" y2="160" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3bAr)"></line>
+        <line x1="474" y1="160" x2="516" y2="160" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3bAr)"></line>
+        <line x1="724" y1="160" x2="752" y2="160" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a3bAr)"></line>
+
+        <rect x="756" y="108" width="108" height="36" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a3bI" x="810" y="131" text-anchor="middle">An owner</text>
+        <rect x="756" y="152" width="108" height="36" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a3bI" x="810" y="175" text-anchor="middle">A number</text>
+        <rect x="756" y="196" width="108" height="36" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a3bI" x="810" y="219" text-anchor="middle">A target</text>
+
+        <rect x="20" y="288" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a3bN" x="44" y="300">A dimension with no owner, no number and no target is a poster.</text>
+        <text class="a3bM" x="44" y="322">Cut anything nobody would act on at 07:00 on a Monday.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - fifteen to six to three, and each survivor carries three obligations.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>An owner, a number and a target, or it is a poster<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three things make a dimension real, and only one of them is technical. The <strong>number</strong> is the measure and its definition, precise enough that two people compute it the same way. The <strong>owner</strong> is a person by name who will be asked about the number, not a team and not a channel. The <strong>target</strong> is the value and the date. Drop the owner and the number drifts. Drop the target and nobody can tell progress from noise. Drop the number and you have a value statement.</p>
+        <div class="prompt-box bad">
+          <span class="label">✗ Not a commitment</span>
+Improve data quality across the analytics estate in H2.
+Focus areas: accuracy, completeness, consistency, timeliness,
+uniqueness, validity.
+        </div>
+        <div class="prompt-box good">
+          <span class="label">★ A commitment</span>
+orders_daily completeness: customer_id null rate under 1 percent,
+measured nightly against its own trailing history.
+Owner: Priya. Target date: 31 October. Reported monthly with two
+other numbers on one page.
+        </div>
+        <p>The second version is smaller than the first in every respect except one: it can be true or false. That is the property you are buying, and it is the reason a three-dimension plan outruns a six-dimension policy.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>How to pick three<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three filters, applied in this order, and the order matters because the first is about value and the last is about feasibility. Anything that survives all three is a candidate. Most estates find that four or five dimensions survive and then have to cut, which is a much better conversation than staring at fifteen.</p>
+        <ul>
+          <li><strong>A business decision depends on it.</strong> Name the decision and the person making it. If the dimension broke, would that decision be wrong in a way somebody would notice and mind? Completeness on a revenue reconciliation qualifies. Portability of the warehouse export does not, for you, tonight.</li>
+          <li><strong>It has actually failed here.</strong> Your incident history is the cheapest prioritisation data you own, and it is free. A dimension that broke twice last year is more likely to break again than one that appears in a framework but has never caused a Monday morning.</li>
+          <li><strong>You can measure it without a project.</strong> If the measure needs a second source of truth, a data-entry review or a new integration, it is a programme and not a dimension you can commit to this quarter. Accuracy fails this filter more often than any other, which is uncomfortable because it is the one people name first.</li>
+        </ul>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's three came out as timeliness, completeness and uniqueness. Timeliness because a 06:00 promise exists and finance works to it. Completeness because that is the dimension the missing-shard incident broke. Uniqueness because the duplicate failure changed nothing about the row count and was only found when a regional manager queried a number he knew was too high. Accuracy was cut, not because it does not matter, but because measuring it needs a reconciliation against the ordering system that nobody had funded. It went on the plan as a project with a date instead of a target with no method.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>A dimension is not a signal<span class="mini">5 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A dimension says what good means. A signal is the thing watched continuously so that a change gets noticed in hours rather than at quarter end. The two lists overlap but they are not the same list, and confusing them produces either monitors nobody asked for or targets nobody can watch.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Dimension</th><th>The signal you actually watch</th><th>Cost to run</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Timeliness</td><td>Freshness: minutes past the promised load time</td><td>Cheap, every 15 minutes</td></tr>
+            <tr><td>Completeness</td><td>Null rate per column, and volume against the same weekday</td><td>Cheap, one pass a night</td></tr>
+            <tr><td>Uniqueness</td><td>Duplicate rate as a percentage, not a pass or fail</td><td>Cheap, one pass a night</td></tr>
+            <tr><td>Validity</td><td>Share of rows failing a documented rule</td><td>Moderate, and the rules must exist first</td></tr>
+            <tr><td>Consistency</td><td>Your count against the source system's own count</td><td>Moderate, needs access to both</td></tr>
+            <tr><td>Accuracy</td><td>No cheap signal. Sampling or reconciliation against reality</td><td>A project, not a monitor</td></tr>
+          </tbody>
+        </table>
+        <p>Two things fall out of that table. The first is that four dimensions have signals your warehouse can produce tonight, and the whole builder track is about turning those into monitors that somebody answers. The second is that accuracy, the dimension every executive names first, has no cheap signal at all. Saying so early is more credible than promising an accuracy number and delivering a completeness one with an accuracy label on it.</p>
+        <div class="callout tip">
+          <p><strong>The reverse mapping is also worth knowing.</strong> Schema change is a signal with no dimension of its own in either published set. Nothing in the six or the fifteen is called "schema", yet a dropped column is the failure that silently empties a report. Frameworks are carve-ups of a space, not inventories of everything that can go wrong, and the gap between the two is where the interesting incidents live.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Pick your three</h2>
+      <span class="tag demo">★ 18 min · everyone builds</span>
+    </div>
+    <p class="lede">Bring your three most-read tables, or borrow Bellwether's if the real names are awkward to say out loud in a room. The output is a short list you can defend in a funding conversation: three dimensions, each with a measure, a named owner and a target date. Nothing on the list should need a tool you do not have.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>List the decisions your top three tables serve.</strong> Not the dashboards, the decisions. "Finance signs off daily revenue", "the operations lead reassigns drivers by region", "the weekly board pack quotes order growth". If a table serves no decision you can name in one sentence, that is your first finding and it changes what you fund.</p>
+      </div>
+      <div class="step">
+        <p><strong>For each decision, name the dimension that would break it.</strong> One dimension per decision, chosen from the six. Force the choice; if two feel equally likely, ask which one has broken before. This step usually collapses nine table-and-decision pairs down to three or four distinct dimensions, which is the whole point.</p>
+      </div>
+      <div class="step">
+        <p><strong>Check whether anybody currently measures it.</strong> Ask the question directly rather than assuming. The three answers you will get are "yes and here is the number", "there is a check somewhere in a pipeline" and silence. Only the first counts. The second is worth ten minutes to find out whether the check has a threshold and a destination, because a check that emails a mailbox nobody reads is measured in name only.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the target as a number with an owner's name.</strong> One line per dimension, in the shape from part 2: table, measure, threshold, owner, date. If you cannot write the owner's actual name, the dimension is not yet funded, and the honest version of your plan says so rather than listing it anyway.</p>
+      </div>
+      <div class="step">
+        <p><strong>Kill the dimensions nobody would act on.</strong> Read the survivors back and ask, for each one, what happens at 07:00 on a Monday when the number goes red. If the answer is "we would look into it", cut it or downgrade it to a quarterly review. You are aiming to leave the room with three, and three is not a failure of ambition, it is what a first quarter can actually deliver.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>Say what you cut and why.</strong> The most common objection to a three-dimension plan is that it ignores the other three. The answer that lands is a second short list: the dimensions you deliberately deferred, each with the reason, and accuracy usually at the top of it with "needs a reconciliation project" written next to it. A visible cut list reads as judgement. A silent one reads as an oversight.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 4</h2>
+      <span class="tag exercise">25 min</span>
+    </div>
+    <ol>
+      <li>Get your three dimensions and their targets in front of the person who would own each number. Not for approval of the target, for confirmation that they accept being the named owner. This is where a plan usually loses a line, and losing it now is cheaper than losing it in October.</li>
+      <li>Write the cut list with one reason per cut dimension. Keep it to a third of a page. It is the part of the plan that gets quoted back to you.</li>
+      <li>Pull the last four quarters of incidents anybody remembers and tag each one with a dimension. If most of them tag to a dimension you did not pick, revisit the pick before it is committed.</li>
+      <li>Find out how many alerts your team's data channel produced last week and roughly how many were real. A count and a rough proportion is enough. Session 4 is about what that ratio costs, and the conversation is much sharper with your own number in hand.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">The inherent characteristics of ISO/IEC 25012 line up closely with the DAMA-DMBOK six, with one exception. Which dimension has no direct ISO characteristic?</p>
+      <button class="qopt" type="button">A · Timeliness, because ISO measures currentness instead</button>
+      <button class="qopt" type="button">B · Validity, because ISO has no notion of conformance to a rule</button>
+      <button class="qopt" type="button">C · Uniqueness, which is a DAMA dimension with nothing corresponding to it in the fifteen</button>
+      <p class="qwhy">Timeliness does have a counterpart, currentness, under a different name. Uniqueness is the real gap. Cite DAMA and your own history for a duplicate-rate target, and do not drop the dimension just because one model omits it.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Availability, portability and recoverability sit in the system-dependent view of ISO/IEC 25012. What are they actually properties of?</p>
+      <button class="qopt" type="button">A · The data itself, measured at a different level of detail</button>
+      <button class="qopt" type="button">B · The application and the environment holding the data, rather than the data</button>
+      <button class="qopt" type="button">C · The business process that produced the data</button>
+      <p class="qwhy">That is why the two views exist. Treating them as data quality is how a quality programme quietly acquires a backup policy. Name them, keep them somebody else's, and your scope stays defensible.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A quality plan lists all six DAMA dimensions with a paragraph of definition each and no owners. What is the most likely outcome after a year?</p>
+      <button class="qopt" type="button">A · Nobody can say whether any dimension improved, because no dimension had a number and a named owner</button>
+      <button class="qopt" type="button">B · Broad but shallow improvement across all six dimensions</button>
+      <button class="qopt" type="button">C · Improvement in the two cheapest dimensions and no change in the rest</button>
+      <p class="qwhy">Definitions do not move numbers. Three dimensions with a measure, an owner and a target outrun six with paragraphs, because only the first shape can be shown to be true or false.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">DAMA-DMBOK quality dimensions</span>
+        <span class="note">All six named as questions, with the decision each one protects and the cost of measuring it.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">ISO/IEC 25012 data quality model</span>
+        <span class="note">All fifteen characteristics named, split into the inherent and system-dependent views, with the seven that appear in both.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The alignment between the two sets, including the uniqueness gap</span>
+        <span class="note">Three characteristics match by name, currentness carries timeliness, credibility has no DAMA twin, and uniqueness has no ISO characteristic at all.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">ISO/IEC 25012 exact definitional wording</span>
+        <span class="note">The standard is a paid document. Names and the two-view structure travel through close secondary sources, which is stated on the page rather than glossed over. Nothing here quotes definitional text as if read from the original.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Attribute-based and role-based access control, NIST SP 800-162</span>
+        <span class="note">Named once for the vocabulary that sits behind the confidentiality characteristic. The substance belongs to an access-control practice, not to a quality measure.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">The signals behind each dimension</span>
+        <span class="note">Mapped here at the level of what it costs to run. Freshness, volume, uniqueness, schema and distribution get a session each in the builder track.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Writing a data quality policy or an operating model</span>
+        <span class="note">Not covered by design. Dimensions are used here to choose what to measure, not to draft policy; classification, rights and the operating model belong to the data governance course.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 3 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The DAMA six</b><span>Accuracy, completeness, consistency, timeliness, uniqueness, validity. The shortlist most rooms already half know.</span></div>
+      <div class="cheat-item"><b>The ISO fifteen</b><span>Five inherent, three system-dependent, seven in both views. The two views are the reusable idea.</span></div>
+      <div class="cheat-item"><b>The one real gap</b><span>Uniqueness has no direct ISO characteristic. Cite DAMA and your own history for that target.</span></div>
+      <div class="cheat-item"><b>Credibility</b><span>ISO has it, DAMA does not. Whether the data is believed, which is not whether it is right.</span></div>
+      <div class="cheat-item"><b>System-dependent</b><span>Availability, portability, recoverability describe the platform, not the data. Not your scope.</span></div>
+      <div class="cheat-item"><b>Three, not fifteen</b><span>A decision depends on it, it has failed here, you can measure it without a project.</span></div>
+      <div class="cheat-item"><b>Owner, number, target</b><span>All three or it is a poster. The owner is a person's name, never a team.</span></div>
+      <div class="cheat-item"><b>Accuracy is a project</b><span>The dimension named first has no cheap signal. Say so before you promise a number.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Leader session 3 of 6 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="a2-five-signals.html">← Leader session 2 · Five signals</a>
+      <a href="a4-alert-or-noise.html">Leader session 4 · Alert or noise →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

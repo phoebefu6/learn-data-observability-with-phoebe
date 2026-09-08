@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 7 of 8. The other four signals say something moved. Lineage says what caused it and what else is affected. Where the graph comes from, why column level is what turns an alert into a triage decision, and the impact query that names who to tell.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Lineage and blast radius - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 7 of 8. Parsed, emitted or collected; table level versus column level; and the impact query that ranks readers by who sees them.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b7-lineage-blast-radius.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lineage and blast radius - learn data observability with phoebe">
+<meta name="twitter:description" content="Four signals tell you something moved. Lineage tells you who is about to read it.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 7 · Lineage and blast radius - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 7 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 7 of 8</div>
+    <h1>Lineage and <span class="accent">blast radius</span></h1>
+    <p class="sub">Freshness, volume, uniqueness and distribution all answer the same question in different words: something moved. None of them tells you what caused it or who is about to be hurt by it. That is what a graph is for, and it is the reason the hardest signal is also the one that changes what happens in the first ten minutes of an incident. Tonight you build the impact query, walk night 23 through it, and find the asset nobody documented.</p>
+    <div class="chip-row">
+      <span class="chip level">🔴 Hardest</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip audience">Platform owners</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · The graph and where it comes from</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: the impact query</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>The signal that changes the first ten minutes</h2>
+    </div>
+    <p class="lede">Sessions 2 to 6 built a monitor set on <strong>analytics.orders_daily</strong> at Bellwether and moved part of it into a framework. Every one of those monitors ends the same way: a notification saying a number is outside its band. What happens next is triage, and triage is a graph problem. Tonight is the fifth signal, the maintenance cost that makes it the last one to buy, and the query that turns a page into a list of names. Session 8 then scores the whole set against 30 nights of history.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> An impact query that takes a table and a column and returns the assets that read it, ranked by whether a human or a customer sees the output. The honest trade between the three ways a lineage graph gets built, so you can pick one on Monday rather than evaluating four vendors for a quarter. And the export nobody knew about, which almost every team finds on the first run of this exercise.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why lineage is the only signal that answers why<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The four metadata signals are properties of one table measured over time. They are cheap, they are precise about what they see, and they are structurally incapable of saying anything about cause, because cause lives in a different table. A volume drop on orders_daily is a fact about orders_daily. That one of three source shards stopped arriving is a fact about the edge between two nodes.</p>
+        <p>The same asymmetry runs downstream. A freshness alert tells you the table is late. Whether that matters depends entirely on who reads it in the next hour, and no amount of metadata about the table itself contains that. This is why teams with excellent detection still have bad incidents: they knew at 06:32 and told the wrong people at 09:15.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Night 23 at Bellwether: <code class="mono">ship_region</code> dropped and <code class="mono">promo_code</code> arrived. The schema monitor fired correctly. The on-call read it, saw that no dashboard was obviously broken, and logged it as an additive change to look at later. Three days of the regional margin report were quietly wrong, and the CRM sync that segments customers by region had been writing nulls into a live campaign the whole time. The detection was fine. The triage had no graph.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What lineage is not for<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>It is not a detector.</strong> A graph does not fire. It answers questions when something else fires, which is why buying lineage first and monitors later gets the order backwards and is a common way to spend a budget without reducing detection time.</li>
+          <li><strong>It is not documentation.</strong> A generated graph records what the code does, including the things nobody meant. That is its value and also why it disagrees with the architecture diagram, and when they disagree the graph is right.</li>
+          <li><strong>It is not a data model.</strong> How the warehouse should be shaped is a design discipline with its own course. Lineage is a description of what currently exists, however ugly.</li>
+          <li><strong>It is not free.</strong> Every route to a graph has a maintenance cost proportional to how much of the estate it covers, and that cost is the reason table tiering from leader session 5 decides where lineage goes.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the three routes to a graph, column level, and the maintenance cost</span>
+      <h2>Lineage is the only signal that answers why</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">A lineage graph is nodes for datasets and jobs, edges for reads and writes, and optionally edges at the level of individual columns. That is the whole data model. Everything difficult about lineage is how the edges get there and what happens when they go stale.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A lineage graph. Two sources, raw.orders and raw.shipments, feed analytics.orders_daily, a tier 1 table. From it, table-level edges run to a revenue dashboard, a finance export and an ops dashboard. Column-level edges for ship_region run to a region mix panel and, off to the side, to a CRM customer sync that nobody documented and that is customer facing.">
+        <style>
+          .b7aW { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b7aK { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .b7aH { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .b7aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b7aR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .b7aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b7aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+          <marker id="b7aCol" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#0369A1"></path>
+          </marker>
+        </defs>
+
+        <text class="b7aH" x="14" y="72">Sources</text>
+        <text class="b7aH" x="254" y="72">Tier 1 table</text>
+        <text class="b7aH" x="580" y="28">Downstream assets</text>
+
+        <rect x="14" y="82" width="150" height="44" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b7aK" x="89" y="103" text-anchor="middle">raw.orders</text>
+        <text class="b7aM" x="89" y="119" text-anchor="middle">3 shards</text>
+
+        <rect x="14" y="150" width="150" height="44" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b7aK" x="89" y="171" text-anchor="middle">raw.shipments</text>
+        <text class="b7aM" x="89" y="187" text-anchor="middle">hourly</text>
+
+        <rect x="254" y="100" width="170" height="62" rx="10" fill="#075985"></rect>
+        <text class="b7aW" x="339" y="127" text-anchor="middle">orders_daily</text>
+        <text class="b7aM" x="339" y="147" text-anchor="middle" fill="#BAE6FD">tier 1, monitored</text>
+
+        <rect x="254" y="172" width="170" height="28" rx="7" fill="#BAE6FD" stroke="#38BDF8"></rect>
+        <text class="b7aK" x="339" y="191" text-anchor="middle">col ship_region</text>
+
+        <line x1="168" y1="104" x2="250" y2="122" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7aAr)"></line>
+        <line x1="168" y1="172" x2="250" y2="142" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7aAr)"></line>
+
+        <rect x="580" y="42" width="180" height="36" rx="8" fill="#38BDF8"></rect>
+        <text class="b7aK" x="670" y="65" text-anchor="middle">Revenue dashboard</text>
+        <text class="b7aM" x="770" y="65">analysts</text>
+
+        <rect x="580" y="94" width="180" height="36" rx="8" fill="#38BDF8"></rect>
+        <text class="b7aK" x="670" y="117" text-anchor="middle">Finance export</text>
+        <text class="b7aM" x="770" y="117">finance</text>
+
+        <rect x="580" y="146" width="180" height="36" rx="8" fill="#38BDF8"></rect>
+        <text class="b7aK" x="670" y="169" text-anchor="middle">Ops dashboard</text>
+        <text class="b7aM" x="770" y="169">ops</text>
+
+        <rect x="580" y="198" width="180" height="36" rx="8" fill="#0369A1"></rect>
+        <text class="b7aW" x="670" y="221" text-anchor="middle">Region mix panel</text>
+        <text class="b7aM" x="770" y="221">growth</text>
+
+        <line x1="424" y1="118" x2="576" y2="60" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7aAr)"></line>
+        <line x1="424" y1="131" x2="576" y2="112" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7aAr)"></line>
+        <line x1="424" y1="144" x2="576" y2="164" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7aAr)"></line>
+
+        <line x1="424" y1="184" x2="576" y2="214" stroke="#0369A1" stroke-width="2" marker-end="url(#b7aCol)"></line>
+        <line x1="424" y1="194" x2="576" y2="300" stroke="#0369A1" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#b7aCol)"></line>
+
+        <rect x="580" y="286" width="180" height="44" rx="8" fill="#F0F9FF" stroke="#991B1B" stroke-dasharray="5 3"></rect>
+        <text class="b7aR" x="670" y="306" text-anchor="middle">CRM customer sync</text>
+        <text class="b7aM" x="670" y="322" text-anchor="middle">customer-facing</text>
+        <text class="b7aM" x="770" y="308">nobody knew</text>
+
+        <line x1="14" y1="348" x2="44" y2="348" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <text class="b7aM" x="52" y="352">table edge</text>
+        <line x1="140" y1="348" x2="170" y2="348" stroke="#0369A1" stroke-width="2"></line>
+        <text class="b7aM" x="178" y="352">column edge: ship_region</text>
+        <line x1="350" y1="348" x2="380" y2="348" stroke="#0369A1" stroke-width="2" stroke-dasharray="5 3"></line>
+        <text class="b7aM" x="388" y="352">undocumented asset</text>
+
+        <rect x="14" y="372" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b7aN" x="38" y="384">The export nobody documented reads ship_region and sits on no dashboard graph.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the two ship_region edges are the ones night 23 actually broke.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The three ways a graph gets built<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three routes, and most estates end up with two of them stitched together. Pick deliberately rather than by whatever the first tool you installed happened to do.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Route</th><th>How it works</th><th>The honest trade</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Parsed from SQL</td><td>A parser reads your transformation code and maps output columns back to input columns</td><td>Cheap, needs no cooperation from anybody, and wrong at the edges. Dynamic SQL, string-built queries, stored procedures, macros and <code class="mono">select *</code> all degrade it silently</td></tr>
+            <tr><td>Emitted at runtime</td><td>Jobs report what they read and wrote as they run, using a standard event format such as OpenLineage</td><td>Accurate, including things no parser could infer, and it requires every job to be instrumented. The uninstrumented job is invisible rather than wrong, which is worse</td></tr>
+            <tr><td>Collected from a catalog</td><td>A catalog or warehouse platform exposes lineage it derived from query history or its own metadata</td><td>Fastest to switch on and bounded by what that platform can see. Anything outside it, which is usually the BI tool and every export, simply is not in the graph</td></tr>
+          </tbody>
+        </table>
+        <p>The parsing route fails loudest and is therefore the safest to start with: you can read the parse errors. The runtime route fails quietly, which is why an emission-based graph needs a coverage number of its own, tracking what fraction of your jobs actually emit.</p>
+        <div class="callout tip">
+          <p><strong>OpenLineage, in one paragraph.</strong> An open standard for lineage metadata: jobs emit events about a run, naming the datasets they read and the datasets they wrote, and each event can carry extensible <em>facets</em> with extra detail, including a column-level lineage facet. The value of a standard here is that a dbt run, a Spark job and a Python script can all report into one graph without anybody writing three integrations. The cost is that the events only exist for the jobs you instrumented.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Table level versus column level<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Table-level lineage says the region mix panel reads orders_daily. Column-level lineage says it reads <code class="mono">ship_region</code> from orders_daily. The difference sounds academic until you are holding a schema alert at 06:40.</p>
+        <ul>
+          <li><strong>Table level answers a yes or no.</strong> Given a broken table, which assets are potentially affected. On a wide table with forty columns and twenty readers, the answer is usually "all twenty", which is not a triage decision.</li>
+          <li><strong>Column level answers a which.</strong> Night 23 dropped <code class="mono">ship_region</code>. Of Bellwether's downstream assets, exactly two read that column. Eighteen readers are unaffected and you can say so, with evidence, in the first message.</li>
+          <li><strong>That narrowing is the whole value.</strong> An alert that names two affected assets gets acted on. An alert that names twenty gets a promise to investigate, which is how three days of a wrong margin report happen.</li>
+          <li><strong>Column level costs more to maintain.</strong> Every route degrades faster at column granularity: a parser that handles <code class="mono">select *</code> badly is fine at table level and useless at column level. Budget for that rather than being surprised by it.</li>
+        </ul>
+        <p>The practical shape most teams land on: table-level lineage across whatever the catalog gives them for free, and column-level lineage maintained deliberately for tier 1 tables only.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The maintenance cost, and why lineage is bought last<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The four metadata signals have a maintenance cost close to zero: a query that computes <code class="mono">count(*)</code> keeps working when the pipeline is rewritten, because it does not know anything about the pipeline. A lineage graph is the opposite. It encodes the structure of the estate, so every change to the estate is a change to the graph, and a graph that is 80 percent correct is more dangerous than no graph because people trust it.</p>
+        <ul>
+          <li><strong>Staleness has no alarm.</strong> A missing edge looks exactly like an asset that genuinely does not read the table. There is no signal that distinguishes them, which is why a stale graph produces confident wrong answers during triage.</li>
+          <li><strong>Coverage is the number to track.</strong> For an emission-based graph, what percentage of scheduled jobs emitted an event in the last seven days. For a parsed graph, what percentage of your transformation files parsed without error. Put that number next to the graph, in the tool, where anybody reading it can see how much to trust it.</li>
+          <li><strong>Tier 1 only, deliberately.</strong> Leader session 5 makes the case for tiering. Lineage is where it pays hardest: a maintained graph over the twenty tables that matter beats an unmaintained graph over nine hundred, and the second option is what happens by default when a tool is switched on estate-wide.</li>
+          <li><strong>It is the last of the five to buy.</strong> Not because it is least valuable but because it is the only one whose value depends on ongoing effort. Freshness and volume monitors keep working if the team stops caring for a quarter. A lineage graph does not.</li>
+        </ul>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>The failure pattern is consistent: a lineage tool is bought, switched on across the whole warehouse, produces an impressive graph in week one, and by month four half the edges predate a pipeline migration nobody re-ran the collector after. The graph is then quoted in an incident review and turns out to have been wrong about the affected assets. The team concludes lineage does not work. What did not work was estate-wide coverage with no owner and no coverage number on the screen.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the triage sequence, exports, and freshness propagation</span>
+      <h2>Blast radius, and the asset nobody documented</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">A page has fired. There are four questions, in this order, and the order matters because the first two decide whether anybody needs to be woken up. What reads this table. Which of those are customer-facing or feed a payment. What has already run since the data went wrong. And who to tell, before they ask.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The triage sequence as four steps. Step one, page fired: enumerate every asset that reads the table, at table and column level. Step two, rank the readers: customer facing first, then payments, then exec, then internal dashboards. Step three, what already ran: every job since the bad load carries the defect forward. Step four, tell them first: owners of tier one reads hear it from you. The strip ends in two outcomes, hold the dashboard or serve stale data with a banner.">
+        <style>
+          .b7bW { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b7bWM { font: 400 11px Inter, sans-serif; fill: #BAE6FD; }
+          .b7bK { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b7bB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .b7bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b7bNum { font: 800 11px Inter, sans-serif; fill: #55697A; }
+          .b7bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b7bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <rect x="14" y="52" width="192" height="118" rx="11" fill="#075985"></rect>
+        <text class="b7bWM" x="28" y="74">01</text>
+        <text class="b7bW" x="28" y="96">Page fired</text>
+        <text class="b7bWM" x="28" y="118">Enumerate every asset</text>
+        <text class="b7bWM" x="28" y="134">that reads orders_daily</text>
+        <text class="b7bWM" x="28" y="150">table and column level</text>
+
+        <rect x="234" y="52" width="192" height="118" rx="11" fill="#0369A1"></rect>
+        <text class="b7bWM" x="248" y="74">02</text>
+        <text class="b7bW" x="248" y="96">Rank the readers</text>
+        <text class="b7bWM" x="248" y="118">Customer-facing first,</text>
+        <text class="b7bWM" x="248" y="134">then payments, then exec,</text>
+        <text class="b7bWM" x="248" y="150">then internal panels</text>
+
+        <rect x="454" y="52" width="192" height="118" rx="11" fill="#38BDF8"></rect>
+        <text class="b7bNum" x="468" y="74">03</text>
+        <text class="b7bK" x="468" y="96">What already ran</text>
+        <text class="b7bB" x="468" y="118">Every job since the bad</text>
+        <text class="b7bB" x="468" y="134">load carries the defect</text>
+        <text class="b7bB" x="468" y="150">forward into its output</text>
+
+        <rect x="674" y="52" width="192" height="118" rx="11" fill="#BAE6FD"></rect>
+        <text class="b7bNum" x="688" y="74">04</text>
+        <text class="b7bK" x="688" y="96">Tell them first</text>
+        <text class="b7bB" x="688" y="118">Owners of tier 1 reads</text>
+        <text class="b7bB" x="688" y="134">hear it from you, not</text>
+        <text class="b7bB" x="688" y="150">from their own numbers</text>
+
+        <line x1="210" y1="111" x2="230" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7bAr)"></line>
+        <line x1="430" y1="111" x2="450" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7bAr)"></line>
+        <line x1="650" y1="111" x2="670" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7bAr)"></line>
+
+        <line x1="770" y1="170" x2="770" y2="188" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="550" y1="188" x2="770" y2="188" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="550" y1="188" x2="550" y2="208" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7bAr)"></line>
+        <line x1="770" y1="188" x2="770" y2="208" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b7bAr)"></line>
+
+        <rect x="454" y="212" width="192" height="42" rx="9" fill="#F0F9FF" stroke="#0369A1"></rect>
+        <text class="b7bK" x="550" y="232" text-anchor="middle">Hold the dashboard</text>
+        <text class="b7bM" x="550" y="248" text-anchor="middle">a number gets quoted</text>
+
+        <rect x="674" y="212" width="192" height="42" rx="9" fill="#F0F9FF" stroke="#0369A1"></rect>
+        <text class="b7bK" x="770" y="232" text-anchor="middle">Stale plus a banner</text>
+        <text class="b7bM" x="770" y="248" text-anchor="middle">a trend is good enough</text>
+
+        <text class="b7bM" x="14" y="228">The graph answers steps 1</text>
+        <text class="b7bM" x="14" y="244">to 3. Step 4 is a person.</text>
+
+        <rect x="14" y="272" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b7bN" x="38" y="284">The first question is never what broke. It is who is about to read it.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - four questions, and the first two decide whether anybody gets woken.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The reverse-ETL and export problem<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The single most common surprise on a first lineage exercise is not a dashboard. It is a quiet job, written eighteen months ago by somebody who has since changed team, that reads a warehouse table and pushes rows somewhere outside the warehouse. A CRM sync. A scheduled CSV to a partner SFTP. A customer-facing export in the product. A spreadsheet on a refresh schedule that a finance analyst built and never mentioned.</p>
+        <ul>
+          <li><strong>They are invisible on a dashboard-only graph.</strong> A BI tool's lineage shows BI assets. A catalog's lineage shows what the warehouse can see. A reverse-ETL job that authenticates as a service account and issues a plain <code class="mono">select</code> looks like any other query, and its destination is not a node anybody registered.</li>
+          <li><strong>They are usually the highest-stakes reader.</strong> An internal dashboard being wrong for a morning is embarrassing. A CRM segment being wrong means a live campaign went to the wrong people, and a customer-facing export means the wrong numbers left the building with your name on them.</li>
+          <li><strong>Query history is where you find them.</strong> Your warehouse logs who queried what. Group the last 30 days of queries against a tier 1 table by service account and role, and every row you cannot immediately name is a candidate. This is a 20-minute exercise and it is the highest-yield 20 minutes in the whole track.</li>
+          <li><strong>Then register them as nodes.</strong> An export is an asset. Give it a name, an owner, an audience and an entry in the graph, so the impact query returns it next time instead of you remembering it.</li>
+        </ul>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's query history for orders_daily showed nine distinct readers. Six were accounted for. Of the remaining three, one was an analyst's ad hoc exploration, one was a decommissioned job still authenticating successfully, and one was the CRM sync that segments customers by <code class="mono">ship_region</code>. On night 23 that column stopped existing. Nobody found out from the graph, because the graph did not contain it.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Freshness propagation, and why nothing is wrong<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A late upstream table makes every downstream table late. Each of those downstream tables is internally consistent, correct, and built from exactly the data it was given. Every freshness monitor on every one of them fires. Every one of those alerts is technically true and none of them is the incident.</p>
+        <ul>
+          <li><strong>One cause, N alerts.</strong> Six downstream tables plus their own downstreams means a dozen pages for a single late shard, arriving over 40 minutes as each job starts and finds nothing new. The graph is what lets you collapse them into one incident with a named root.</li>
+          <li><strong>Suppress by ancestry, not by time.</strong> The naive fix is to hold alerts for 15 minutes and dedupe. The right fix is: if an ancestor of this table is currently alerting on freshness, this alert is a symptom, so attach it to that incident rather than raising a new one. That requires a graph, which is one of the concrete arguments for building one.</li>
+          <li><strong>Late is not wrong, and the message must say which.</strong> A downstream table that is late because its source was late needs the message "waiting on orders_daily", not "data quality issue". Those prompt completely different behaviour from whoever reads it.</li>
+          <li><strong>The root is not always the loudest.</strong> The first alert to fire is the table with the tightest deadline, not the table that caused it. Sorting alerts by time is how people spend twenty minutes debugging a healthy mart.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Hold the dashboard, or serve stale with a banner<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Once the graph has told you which assets are affected, there is a decision per asset, and it is not a technical one. You can block the asset so nobody sees wrong numbers, or let it serve the last known good data with a visible notice. Both are defensible and the graph supplies the input for choosing.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Situation</th><th>Choose</th><th>Because</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A number will be quoted in a meeting or an invoice</td><td>Hold it</td><td>A wrong number that has been read aloud cannot be recalled, and the correction costs more than the delay</td></tr>
+            <tr><td>The reader wants a trend or a direction</td><td>Serve stale, banner it</td><td>Yesterday's shape is usually good enough, and blocking the panel produces a support ticket and a workaround spreadsheet</td></tr>
+            <tr><td>A customer sees the output</td><td>Hold it, and say so</td><td>Reputational cost is asymmetric, and a maintenance notice is a much smaller event than a wrong statement</td></tr>
+            <tr><td>The asset feeds a payment or a payout</td><td>Hold it, always</td><td>Money moved on bad data is recovered by a person and a process, not by a backfill</td></tr>
+            <tr><td>An internal panel that ten people glance at</td><td>Serve stale, banner it</td><td>The banner is the whole intervention. Holding it just moves the question into a chat channel</td></tr>
+          </tbody>
+        </table>
+        <p>Two implementation notes that make the difference between a policy and a slide. The banner text needs the age of the data and the reason, not the word "stale", because a reader has to decide whether it is usable. And the decision per asset should be recorded in the graph as a property of the node, agreed in advance with the owner, so that at 06:40 the on-call reads a decision rather than making one.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>The impact query</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Four steps, and step one is deliberately low-tech because most people have no lineage store yet and can still finish this. The target is a query that takes a table and a column and returns the assets that read it, ranked by who sees the output. Then night 23 goes through it and produces a list of names.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>1. Enumerate downstream assets by whatever means you have.</strong> Three sources, in the order they cost you time. Your warehouse query history, which is authoritative about who actually read the table. Your transformation project's own graph, which covers everything it builds. And your BI tool's dependency list. Union the three, by hand if necessary, into a list of assets.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+-- who actually touched this table in the last 30 days
+select
+  user_name,
+  role_name,
+  count(*)                  as queries,
+  min(start_time)           as first_seen,
+  max(start_time)           as last_seen
+from information_schema.query_history
+where query_text ilike '%orders_daily%'
+  and start_time &gt;= current_date - 30
+group by 1, 2
+order by queries desc;
+        </div>
+        <p>Every row here that you cannot name is a candidate for the asset nobody documented. Service accounts are the interesting ones: a human running ad hoc queries is not a downstream asset, and a service account issuing the same query every morning at 07:15 certainly is.</p>
+      </div>
+      <div class="step">
+        <p><strong>2. Give the lineage store a shape.</strong> Two tables are enough, and starting with two tables you maintain by hand beats waiting for a platform. Edges carry the reads, assets carry the audience, and the audience column is what makes ranking possible.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+create table meta.lineage_edges (
+  source_table   varchar not null,   -- analytics.orders_daily
+  source_column  varchar,            -- ship_region, or '*' for whole table
+  target_asset   varchar not null,   -- region_mix_panel
+  edge_type      varchar not null    -- read, export, sync
+);
+
+create table meta.assets (
+  asset_name     varchar primary key,
+  asset_kind     varchar not null,   -- dashboard, model, export, sync
+  audience       varchar not null,   -- customer, payment, exec, internal
+  owner          varchar not null,   -- a person, not a team alias
+  on_incident    varchar not null    -- hold, banner
+);
+        </div>
+        <p>The <code class="mono">on_incident</code> column is the decision from part 2, agreed in advance with the owner. Recording it here is what turns triage from a judgement call at 06:40 into a lookup.</p>
+      </div>
+      <div class="step">
+        <p><strong>3. Write the impact query.</strong> Given a table and a column, return every asset that reads it, transitively, ranked by audience and then by hops. The recursive term is what catches the asset two levels down that nobody thinks of.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with recursive downstream (asset, depth) as (
+    select target_asset, 1
+    from meta.lineage_edges
+    where source_table = 'analytics.orders_daily'
+      and source_column in ('ship_region', '*')
+  union all
+    select e.target_asset, d.depth + 1
+    from meta.lineage_edges e
+    join downstream d on e.source_table = d.asset
+    where d.depth &lt; 5
+)
+select
+  a.asset_name,
+  a.asset_kind,
+  a.audience,
+  a.owner,
+  a.on_incident,
+  min(d.depth) as hops
+from downstream d
+join meta.assets a on a.asset_name = d.asset
+group by 1, 2, 3, 4, 5
+order by
+  case a.audience
+    when 'customer' then 0
+    when 'payment'  then 1
+    when 'exec'     then 2
+    else 3
+  end,
+  hops;
+        </div>
+        <p>Two details worth keeping. The <code class="mono">source_column in ('ship_region', '*')</code> clause is what makes one query serve both table-level and column-level questions: pass a column and you get the narrow answer, pass <code class="mono">'*'</code> alone and you get everything. And the depth guard is not paranoia; a hand-maintained graph acquires a cycle the first time somebody registers a round trip through a reverse-ETL job.</p>
+      </div>
+      <div class="step">
+        <p><strong>4. Walk night 23 through it, and write the list of names.</strong> Night 23 dropped <code class="mono">ship_region</code> and added <code class="mono">promo_code</code>. Run the impact query for that column and read the output as an incident, not as a table.</p>
+        <ul>
+          <li><strong>Two assets read <code class="mono">ship_region</code>.</strong> The region mix panel, audience internal, owner in growth, decision banner. And the CRM customer sync, audience customer, decision hold. Eighteen other readers of orders_daily are unaffected, and saying so in the first message is what stops the whole analytics team investigating.</li>
+          <li><strong>The customer-facing one comes first.</strong> Sorting by audience puts the CRM sync at the top, which is the correct order to work in and the opposite of the order the alerts arrived in.</li>
+          <li><strong>Then step three: what already ran.</strong> The sync runs at 07:15 daily. Night 23's load landed before that, so it has already pushed a segmentation built on a missing column. That is a specific fact with a specific remediation, and no metadata monitor could have produced it.</li>
+          <li><strong>Then the names.</strong> The growth owner of the panel, so they know the last three days are wrong. The owner of the CRM sync, and whoever runs campaigns off those segments. The person who dropped the column, not to blame but because they are the only one who knows whether the change was meant to be additive. Four names, all from the graph plus the assets table.</li>
+          <li><strong>Now find the one you missed.</strong> Diff the query-history list from step 1 against the assets you registered in step 2. Whatever is in the first list and not the second is your undocumented asset. Register it, give it an owner and a decision, and note the date, because the interesting number is how long it had been reading a tier 1 table unrecorded.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The output to aim for after 20 minutes.</strong> One query, two small tables, and a five-line incident note for night 23 naming the two affected assets, the job that already ran on bad data, and four people. Compare that note against what a schema alert on its own gave you in session 4. Same detection, same minute, a different next hour.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 8</h2>
+      <span class="tag exercise">35 min</span>
+    </div>
+    <ol>
+      <li>Run the query-history sweep against your own tier 1 table and list every reader you cannot name. Most people find between one and three. Whatever you find, write down how long it had been there.</li>
+      <li>Register your assets with an owner who is a person and an audience that distinguishes customer-facing from internal. A team alias in the owner column means nobody gets told.</li>
+      <li>Agree the hold-or-banner decision for your three highest-audience assets with their actual owners, and record it on the node. Doing this in advance is the entire point.</li>
+      <li>Put a coverage number next to your graph: what fraction of jobs emit, or what fraction of transformation files parse. A graph without that number gets trusted more than it deserves.</li>
+      <li>Bring your monitor set from sessions 2 to 6 to session 8, including the thresholds. The bench scores what you actually built rather than an example.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Night 23 dropped <code class="mono">ship_region</code> from a table with twenty downstream readers. What does column-level lineage give you that table-level lineage does not?</p>
+      <button class="qopt" type="button">A · Earlier detection, because column edges are checked more often</button>
+      <button class="qopt" type="button">B · Nothing useful, since any schema change affects every reader of the table</button>
+      <button class="qopt" type="button">C · The narrowing from twenty possibly-affected assets to the two that actually read that column</button>
+      <p class="qwhy">Table level answers a yes or no and returns all twenty. Column level answers a which, and an alert naming two affected assets gets acted on where an alert naming twenty gets a promise to investigate.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A lineage graph is built by runtime emission from instrumented jobs. What is the characteristic failure mode?</p>
+      <button class="qopt" type="button">A · An uninstrumented job is simply absent, and a missing edge looks identical to an asset that genuinely does not read the table</button>
+      <button class="qopt" type="button">B · Emitted events are less accurate than parsed SQL because they run after the fact</button>
+      <button class="qopt" type="button">C · The graph cannot represent column-level edges</button>
+      <p class="qwhy">Runtime emission is the accurate route and it fails quietly. That is why an emission-based graph needs its own coverage number, tracking what fraction of scheduled jobs actually emitted in the last seven days.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">A late source shard produces twelve freshness alerts across downstream tables over 40 minutes. What is the right handling?</p>
+      <button class="qopt" type="button">A · Hold all alerts for 15 minutes and dedupe by table name</button>
+      <button class="qopt" type="button">B · Attach any alert whose ancestor is currently alerting on freshness to that incident, rather than raising a new one</button>
+      <button class="qopt" type="button">C · Disable freshness monitors on downstream tables and keep them on sources only</button>
+      <p class="qwhy">Every one of the twelve is technically true and none is the incident. Suppressing by ancestry collapses them into one incident with a named root, and it needs a graph, which is one of the concrete arguments for building one.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Lineage as the fifth signal, and the three routes to a graph</span>
+        <span class="note">Parsed from SQL, emitted at runtime, or collected from a catalog, with the honest trade for each and the failure mode each one hides.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">OpenLineage as the runtime emission standard</span>
+        <span class="note">Run events naming the datasets a job read and wrote, with extensible facets including column-level lineage. Named as the reason one graph can hold events from several kinds of job.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Column-level lineage and the impact query</span>
+        <span class="note">A working recursive query that takes a table and a column and ranks readers by audience, plus the depth guard a hand-maintained graph needs.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Blast radius, undocumented reverse-ETL and freshness propagation</span>
+        <span class="note">The four-question triage sequence, the query-history sweep that finds the unregistered export, ancestry-based suppression, and the hold-or-banner decision recorded on the node.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Catalog and lineage platform selection</span>
+        <span class="note">Route trade-offs and the questions to ask, with no product comparison. Leader session 6 covers the buying conversation; leader session 5 covers the tiering that decides where lineage goes.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Warehouse modelling and DAG design</span>
+        <span class="note">Not covered by design. How the estate should be shaped is a design discipline; a lineage graph describes what currently exists, however ugly.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 7 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>What lineage is for</b><span>The other four signals say something moved. Lineage says what caused it and who is about to read it.</span></div>
+      <div class="cheat-item"><b>Three routes</b><span>Parsed is cheap and wrong at the edges. Emitted is accurate and needs every job instrumented. Collected is fast and bounded by one platform.</span></div>
+      <div class="cheat-item"><b>Column level</b><span>Turns twenty possibly-affected assets into the two that read the dropped column. That narrowing is the whole value.</span></div>
+      <div class="cheat-item"><b>Coverage number</b><span>Put it next to the graph. A stale graph gives confident wrong answers, and a missing edge has no alarm.</span></div>
+      <div class="cheat-item"><b>Tier 1 only</b><span>A maintained graph over twenty tables beats an unmaintained one over nine hundred. Lineage is the last of the five to buy.</span></div>
+      <div class="cheat-item"><b>Triage order</b><span>What reads it, who sees them, what already ran, who to tell. The first two decide whether anybody gets woken.</span></div>
+      <div class="cheat-item"><b>The export nobody knew</b><span>Group 30 days of query history by service account. Every row you cannot name is a candidate.</span></div>
+      <div class="cheat-item"><b>Hold or banner</b><span>Hold when a number gets quoted, a customer sees it, or money moves. Banner when a trend is enough. Decide before 06:40.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 7 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b6-expectations-as-code.html">← Builder session 6 · Expectations as code</a>
+      <a href="b8-monitor-bench.html">Builder session 8 · The monitor bench →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

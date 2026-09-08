@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 4 of 8. Three classes of schema change, only one of which any check currently sees. The column-set diff in working SQL, and the honest complication: a revert is also a change, so the monitor fires twice.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Schema change: the break you can see coming - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 4 of 8. Additive, breaking, and silently breaking. The set-difference monitor, the type diff, and why a rollback pages too.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b4-schema-change.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Schema change: the break you can see coming - learn data observability with phoebe">
+<meta name="twitter:description" content="Two set differences, one page you wanted and one you did not.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 4 · Schema change: the break you can see coming - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 4 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 4 of 8</div>
+    <h1>Schema change: the break you can <span class="accent">see coming</span></h1>
+    <p class="sub">A schema change is the only failure on the whole list that leaves a receipt. The column list is stored, it is free to read, and comparing tonight's against last night's is two set differences. So this is the cheapest monitor in the set and also the one with the most interesting judgement call in it, because the same query that catches a dropped column on night 23 fires again on night 24 when somebody puts it back.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · Additive, breaking, and the ones in between</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: the column-set diff</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where the monitor set stands</h2>
+    </div>
+    <p class="lede">The artifact so far: a metrics table recording one row per night for <strong>analytics.orders_daily</strong> at Bellwether, plus a freshness monitor set from the trailing distribution and a volume monitor set from the same-weekday median. Three signals instrumented, two nights of the 30-night history caught. Tonight adds the fourth signal, and it is the one that arrives with a paper trail: the column set. Session 5 takes distribution, session 6 wires the whole thing into expectations as code.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A nightly snapshot of <code class="mono">information_schema.columns</code> landing in the metrics table, a diff query that names what was dropped and what was added in one sentence, and a routing rule that sends an addition to a channel and a removal to the rota. Plus the decision that everybody postpones and then regrets: whether a rollback is a page.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why schema is the cheapest signal to instrument<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Freshness needs a promise. Volume needs a history. Uniqueness needs a key you agree on. Schema needs none of those: the warehouse already publishes the column list of every table it holds, and the check is a comparison of two lists. There is nothing to tune, no band to widen, no percentile to argue about. Snapshot the list nightly and the monitor is finished.</p>
+        <p>What makes it interesting is the other end. A freshness page says "late", which everybody understands. A schema page says "the shape changed", and what happens next depends entirely on <em>which</em> change it was. One class of change is harmless, one breaks loudly, and one passes every check you own while quietly corrupting numbers downstream.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>On night 23 at Bellwether, <code class="mono">ship_region</code> was dropped and <code class="mono">promo_code</code> was added in the same upstream release. Nothing errored. Two dashboards had a region filter that silently lost its column and started aggregating nationally, and the regional managers spent a week comparing numbers that no longer meant what the axis label said.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The three questions a schema page has to answer<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A message that says "schema changed on orders_daily" sends the reader to go and look, which costs them 20 minutes before they know whether it matters. Three facts turn it into a decision:</p>
+        <ul>
+          <li><strong>What changed, by name.</strong> Not a count. "dropped ship_region; added promo_code" is the whole difference between a page that gets triaged and a page that gets starred for later.</li>
+          <li><strong>Which class it belongs to.</strong> Addition only, removal, or a type change. The class is what decides the route, and the diff query can label it without any extra work.</li>
+          <li><strong>Who reads the column.</strong> This is the lineage question and session 7 answers it properly. Until then, a hand-maintained list of the five columns that appear in dashboard filters gets you most of the value for an afternoon of work.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the three classes and which checks see each one</span>
+      <h2>Not all schema changes are equal</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">Three classes, and the ranking by cost is the opposite of the ranking by noise. The change that breaks loudly is the cheap one, because it is fixed by lunchtime. The expensive class is the one where every check you own passes and the numbers move anyway.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three classes of schema change side by side. Purely additive: a new column appears, nothing breaks, the column diff sees it. Breaking: a column is dropped or a type narrows, queries error the same morning, the diff sees it. Silently breaking: a type widens or a code column gains a value, nothing errors, and no check currently sees it at all.">
+        <style>
+          .b4aT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .b4aTi { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .b4aK { font: 700 10px Inter, sans-serif; fill: #55697A; }
+          .b4aB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .b4aQ { font: 600 11px "SFMono-Regular", Menlo, monospace; fill: #082F44; }
+          .b4aR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .b4aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .b4aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+        </style>
+
+        <text class="b4aM" x="14" y="26">Same table, same night. Three shapes of change, three very different mornings.</text>
+
+        <rect x="14" y="42" width="274" height="44" rx="10" fill="#BAE6FD"></rect>
+        <text class="b4aTi" x="151" y="70" text-anchor="middle">1 · Purely additive</text>
+        <rect x="14" y="94" width="274" height="212" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b4aK" x="28" y="118">EXAMPLE</text>
+        <text class="b4aQ" x="28" y="138">promo_code appears</text>
+        <text class="b4aK" x="28" y="170">DOWNSTREAM</text>
+        <text class="b4aB" x="28" y="190">Nothing breaks, unless a</text>
+        <text class="b4aB" x="28" y="207">query said select star.</text>
+        <text class="b4aK" x="28" y="239">WHO SEES IT</text>
+        <text class="b4aB" x="28" y="259">The column diff, and</text>
+        <text class="b4aB" x="28" y="276">nobody else needs to.</text>
+        <text class="b4aB" x="28" y="293" fill="#55697A">Route: a channel.</text>
+
+        <rect x="303" y="42" width="274" height="44" rx="10" fill="#0369A1"></rect>
+        <text class="b4aT" x="440" y="70" text-anchor="middle">2 · Breaking</text>
+        <rect x="303" y="94" width="274" height="212" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b4aK" x="317" y="118">EXAMPLE</text>
+        <text class="b4aQ" x="317" y="138">ship_region dropped;</text>
+        <text class="b4aQ" x="317" y="155">bigint narrows to int</text>
+        <text class="b4aK" x="317" y="170">DOWNSTREAM</text>
+        <text class="b4aB" x="317" y="190">Queries error the same</text>
+        <text class="b4aB" x="317" y="207">morning. Loud, and fast</text>
+        <text class="b4aB" x="317" y="224">to trace.</text>
+        <text class="b4aK" x="317" y="239">WHO SEES IT</text>
+        <text class="b4aB" x="317" y="259">The diff, plus every</text>
+        <text class="b4aB" x="317" y="276">broken build at once.</text>
+        <text class="b4aB" x="317" y="293" fill="#55697A">Route: the rota.</text>
+
+        <rect x="592" y="42" width="274" height="44" rx="10" fill="#075985"></rect>
+        <text class="b4aT" x="729" y="70" text-anchor="middle">3 · Silently breaking</text>
+        <rect x="592" y="94" width="274" height="212" rx="12" fill="#F0F9FF" stroke="#B45309"></rect>
+        <text class="b4aK" x="606" y="118">EXAMPLE</text>
+        <text class="b4aQ" x="606" y="138">int widens to numeric;</text>
+        <text class="b4aQ" x="606" y="155">status gains a value</text>
+        <text class="b4aK" x="606" y="170">DOWNSTREAM</text>
+        <text class="b4aB" x="606" y="190">Sums drift, a case</text>
+        <text class="b4aB" x="606" y="207">statement drops rows,</text>
+        <text class="b4aB" x="606" y="224">no error anywhere.</text>
+        <text class="b4aK" x="606" y="239">WHO SEES IT</text>
+        <text class="b4aR" x="606" y="259">Nothing you have on</text>
+        <text class="b4aR" x="606" y="276">tonight.</text>
+        <text class="b4aB" x="606" y="293" fill="#55697A">Route: a second diff.</text>
+
+        <rect x="14" y="326" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b4aN" x="38" y="338">Class 3 is the expensive one precisely because every check passes.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the loud class is the cheap one; the quiet class is the one that costs a week.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Additive: safe, and worth a page anyway<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A new column appears. Every existing query names its columns explicitly, so every existing query is unaffected. This is the class that a schema monitor is accused of being noisy about, and the accusation is fair right up to the moment somebody deploys a model that reads the table with <code class="mono">select *</code> and gains a column nobody validated.</p>
+        <p>An addition is still worth knowing about for a reason that has nothing to do with breakage: it is evidence that an upstream team shipped something. A new column is the only free notification you will ever get that a producer changed their mind about what this table contains. Route it to a channel, not to a person, and read it once a week.</p>
+        <div class="callout tip">
+          <p><strong>The one case where additive is not additive.</strong> A column added with the same name as one you had computed downstream. Your model produces <code class="mono">promo_code</code> from a join, the source starts producing <code class="mono">promo_code</code> natively, and now two things with one name disagree. This is the additive change that has caused the most damage in practice.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Breaking: loud, and therefore cheap<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A column is dropped, or renamed, which the warehouse reports as one drop plus one addition. Or a type narrows: <code class="mono">bigint</code> to <code class="mono">int</code>, <code class="mono">numeric(18,4)</code> to <code class="mono">numeric(10,2)</code>, a wide varchar to a short one. Anything that can no longer hold the values that used to fit.</p>
+        <p>These fail fast and they fail visibly. Builds error, dashboards show a column-not-found message, and somebody complains within the hour. The monitor buys you the head start between the load finishing and the first human noticing, which on a nightly table is often the difference between fixing it before 09:00 and explaining it at 09:15.</p>
+        <p>Renames deserve one specific warning. A set difference reports a rename as <code class="mono">dropped ship_region; added shipping_region</code>, and a tired reader at 07:00 sees "dropped" and starts an incident. Worth teaching the message to say "possible rename" when a drop and an addition arrive on the same night, which costs one line of logic and saves a false escalation.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Silently breaking: the widening class<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The class that costs real money. Nothing errors, no query fails, and the column list is unchanged, so a column-set diff is blind to all of it.</p>
+        <ul>
+          <li><strong>A type widens.</strong> An integer becomes a numeric. Every downstream sum still runs, and results that used to be whole numbers now carry fractions that a rounding step in a report may or may not handle the same way as before.</li>
+          <li><strong>A timestamp loses or gains a timezone.</strong> <code class="mono">timestamp</code> to <code class="mono">timestamptz</code> is a widening in the type system and a change of meaning in the data. Every date-bucketed count shifts by the offset, which for a grocery delivery company means orders moving between days.</li>
+          <li><strong>A code column starts carrying a new value.</strong> <code class="mono">status</code> gains <code class="mono">held</code>. Every <code class="mono">case when status in ('placed','shipped','cancelled')</code> in the estate now sends those rows to the <code class="mono">else</code> branch or drops them entirely, and the totals get quietly smaller.</li>
+        </ul>
+        <p>The first two are catchable with a second diff on <code class="mono">data_type</code>, which is the same query shape and the same free metadata. The third is not a schema change at all in the strict sense: the column list and the types are identical. It is a distribution change, and it belongs to the segment-share statistic in session 5.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Nullability, defaults and the changes that only bite on backfill<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three more shapes worth storing in the snapshot, all of them free and all of them invisible to a column-set diff.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Change</th><th>What breaks</th><th>When you find out</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A column goes from not-null to nullable</td><td>Nothing today. Joins start dropping rows the first night a null actually arrives</td><td>Days or weeks later, as a volume drift nobody can explain</td></tr>
+            <tr><td>A default is added or removed</td><td>Rows that used to carry a value now carry null, or the reverse</td><td>On the next insert path that omits the column</td></tr>
+            <tr><td>Column order changes</td><td>Anything positional: a copy command, an unload, a stored insert without a column list</td><td>Immediately and confusingly, with values in the wrong columns</td></tr>
+          </tbody>
+        </table>
+        <p>Nullability is the one to store first, because it is a single extra column in the snapshot and it is the leading indicator for a null-rate incident of exactly the kind session 5 measures. A column that became nullable on night 20 and jumped to 11 percent null on night 25 is not a mystery. It is a change you already recorded.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the diff, the revert, and where the column set comes from</span>
+      <h2>The diff, and the revert problem</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">The monitor is a set difference in both directions between tonight's column set and last night's, reported separately so the message can name the class. That is the whole implementation. The complication is not in the SQL, it is in what the diff means on the second night.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three nightly column-set snapshots for orders_daily. Night 22 holds the nine base columns. Night 23 has lost ship_region and gained promo_code, and the first diff reports both. Night 24 has reverted to the night 22 column set, and the second diff reports the reverse, so the monitor pages again on a night when nothing was wrong.">
+        <style>
+          .b4bH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b4bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b4bC { font: 500 10.5px "SFMono-Regular", Menlo, monospace; fill: #082F44; }
+          .b4bCa { font: 700 10.5px "SFMono-Regular", Menlo, monospace; fill: #B45309; }
+          .b4bCr { font: 700 10.5px "SFMono-Regular", Menlo, monospace; fill: #991B1B; }
+          .b4bD { font: 700 10.5px Inter, sans-serif; fill: #0C1B26; }
+          .b4bK { font: 800 11px Inter, sans-serif; fill: #fff; }
+          .b4bR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .b4bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b4bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="b4bM" x="14" y="24">One row per table per night, snapshotted from information_schema.columns.</text>
+
+        <text class="b4bH" x="14" y="48">Night 22 · quiet</text>
+        <rect x="14" y="58" width="196" height="192" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b4bC" x="28" y="82">order_id</text>
+        <text class="b4bC" x="28" y="99">customer_id</text>
+        <text class="b4bC" x="28" y="116">order_ts</text>
+        <text class="b4bC" x="28" y="133">amount</text>
+        <text class="b4bC" x="28" y="150">currency</text>
+        <text class="b4bC" x="28" y="167">status</text>
+        <text class="b4bC" x="28" y="184">channel</text>
+        <rect x="22" y="190" width="180" height="16" rx="4" fill="#BAE6FD"></rect>
+        <text class="b4bC" x="28" y="201">ship_region</text>
+        <text class="b4bC" x="28" y="222">updated_at</text>
+        <text class="b4bM" x="28" y="242">9 columns</text>
+
+        <text class="b4bH" x="342" y="48">Night 23 · the defect</text>
+        <rect x="342" y="58" width="196" height="192" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b4bC" x="356" y="82">order_id</text>
+        <text class="b4bC" x="356" y="99">customer_id</text>
+        <text class="b4bC" x="356" y="116">order_ts</text>
+        <text class="b4bC" x="356" y="133">amount</text>
+        <text class="b4bC" x="356" y="150">currency</text>
+        <text class="b4bC" x="356" y="167">status</text>
+        <text class="b4bC" x="356" y="184">channel</text>
+        <text class="b4bC" x="356" y="201">updated_at</text>
+        <text class="b4bCa" x="356" y="222">+ promo_code</text>
+        <text class="b4bCr" x="356" y="242">ship_region gone</text>
+
+        <text class="b4bH" x="670" y="48">Night 24 · reverted</text>
+        <rect x="670" y="58" width="196" height="192" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b4bC" x="684" y="82">order_id</text>
+        <text class="b4bC" x="684" y="99">customer_id</text>
+        <text class="b4bC" x="684" y="116">order_ts</text>
+        <text class="b4bC" x="684" y="133">amount</text>
+        <text class="b4bC" x="684" y="150">currency</text>
+        <text class="b4bC" x="684" y="167">status</text>
+        <text class="b4bC" x="684" y="184">channel</text>
+        <rect x="678" y="190" width="180" height="16" rx="4" fill="#BAE6FD"></rect>
+        <text class="b4bCa" x="684" y="201">+ ship_region</text>
+        <text class="b4bC" x="684" y="222">updated_at</text>
+        <text class="b4bCr" x="684" y="242">promo_code gone</text>
+
+        <line x1="210" y1="154" x2="218" y2="154" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b4bAr)"></line>
+        <rect x="222" y="96" width="108" height="116" rx="10" fill="#0369A1"></rect>
+        <text class="b4bK" x="276" y="118" text-anchor="middle">Diff 1</text>
+        <text class="b4bD" x="276" y="140" text-anchor="middle" fill="#fff">dropped</text>
+        <text class="b4bD" x="276" y="155" text-anchor="middle" fill="#fff">ship_region</text>
+        <text class="b4bD" x="276" y="175" text-anchor="middle" fill="#fff">added</text>
+        <text class="b4bD" x="276" y="190" text-anchor="middle" fill="#fff">promo_code</text>
+        <line x1="330" y1="154" x2="338" y2="154" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b4bAr)"></line>
+        <text class="b4bN" x="276" y="230" text-anchor="middle">a page you wanted</text>
+
+        <line x1="538" y1="154" x2="546" y2="154" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b4bAr)"></line>
+        <rect x="550" y="96" width="108" height="116" rx="10" fill="#075985"></rect>
+        <text class="b4bK" x="604" y="118" text-anchor="middle">Diff 2</text>
+        <text class="b4bD" x="604" y="140" text-anchor="middle" fill="#fff">dropped</text>
+        <text class="b4bD" x="604" y="155" text-anchor="middle" fill="#fff">promo_code</text>
+        <text class="b4bD" x="604" y="175" text-anchor="middle" fill="#fff">added</text>
+        <text class="b4bD" x="604" y="190" text-anchor="middle" fill="#fff">ship_region</text>
+        <line x1="658" y1="154" x2="666" y2="154" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b4bAr)"></line>
+        <text class="b4bR" x="604" y="230" text-anchor="middle">a page nobody wanted</text>
+
+        <rect x="14" y="278" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b4bN" x="38" y="290">Diff 2 is the revert. The query cannot tell it from a fresh break.</text>
+        <text class="b4bR" x="14" y="318">Night 24 is one of the two false pages left at the top of the bench.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the monitor compares tonight against last night, so a rollback is a change too.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Deciding in advance whether a revert is a page<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Night 23 drops <code class="mono">ship_region</code> and adds <code class="mono">promo_code</code>. Night 24 puts it back. The diff on night 24 reads <code class="mono">dropped promo_code; added ship_region</code>, which is a true statement about a real difference between two consecutive nights, and it arrives as a page on a night when nothing was wrong.</p>
+        <p>There is no clever query that fixes this, because the monitor is not mistaken. It is answering the question it was asked. What has to change is the question, and there are three defensible answers:</p>
+        <ul>
+          <li><strong>Compare against last night.</strong> A revert pages. You accept one extra page per incident in exchange for a monitor with no state to maintain and no concept of "correct". This is what the bench runs, and it is why the top rung carries a false page it cannot remove.</li>
+          <li><strong>Compare against a declared column set.</strong> A revert is silence, because the shape now matches the declaration again. The cost is that somebody has to maintain the declaration, and a declaration that drifts from reality is worse than no declaration.</li>
+          <li><strong>Compare against last night, then suppress a diff that exactly inverts the previous one.</strong> Cheap, catches the common case, and quietly hides a genuine flap where a column appears and disappears nightly. If you take this route, count the suppressions and look at the count weekly.</li>
+        </ul>
+        <p>Pick one before the first page arrives. The reason to decide in advance is that the decision made at 07:20 on the morning of a revert is always the same one, which is to mute the monitor.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Where the column set comes from<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><code class="mono">information_schema.columns</code> is in every warehouse that speaks SQL, and it carries more than the names: <code class="mono">data_type</code>, <code class="mono">is_nullable</code>, <code class="mono">character_maximum_length</code>, <code class="mono">numeric_precision</code> and <code class="mono">ordinal_position</code>. Reading it is free and instant, because it is catalogue metadata rather than data.</p>
+        <p>The important part is that a live read is not enough. <code class="mono">information_schema</code> tells you what the table looks like now, and a diff needs what it looked like last night, which nothing stores for you. So the monitor has two halves: a snapshot job that appends the current column set to the metrics table every night, and a diff query that reads two nights out of it. The snapshot is the half that has to run reliably, because a missing snapshot makes tomorrow's diff compare against the wrong night and report a change that never happened.</p>
+        <div class="callout tip">
+          <p><strong>Snapshot the whole schema, not just the table you are monitoring.</strong> The row is nine values wide and there are maybe 400 tables. Storing all of them costs nothing and means that the next time somebody asks when a column disappeared, the answer is a query rather than an archaeology project.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The second diff: types and nullability<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Once the snapshot carries <code class="mono">data_type</code> and <code class="mono">is_nullable</code>, the second diff is a full outer join on column name rather than two set differences, and it catches the first two members of the silent class.</p>
+        <p>Two practical notes. First, warehouses report type names inconsistently across versions, so <code class="mono">numeric</code> can become <code class="mono">decimal</code> with no underlying change at all. Normalise the type string before comparing, or your first week is all false pages. Second, distinguish widening from narrowing in the message: <code class="mono">int</code> to <code class="mono">bigint</code> is almost always safe and worth a channel note, while <code class="mono">bigint</code> to <code class="mono">int</code> can truncate and belongs on the rota.</p>
+        <p>Precision is the one people skip and regret. <code class="mono">numeric(18,4)</code> to <code class="mono">numeric(18,2)</code> is neither an addition, a removal, nor a type change by name. It is a silent rounding of every amount in the table, and it shows up as a two-cent difference in a reconciliation three weeks later.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why this monitor pays for itself on tables you do not own<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>On a table you build, a schema change is something you did. It is in a pull request, it went through review, and the diff mostly tells you what you already know. The monitor is still worth having, because the deploy that changed the shape was not always the deploy you were watching, but its value is modest.</p>
+        <p>On a table another team produces, a schema change is an event you had no part in. There was no ticket on your board, no review you were invited to, and the first signal available to you is the shape of the data on the morning after. That is exactly the gap a metadata monitor exists to fill, and it is why the schema check earns its slot on ingested and third-party tables far more than on your own marts.</p>
+        <p>Build-time schema enforcement on tables you produce is a different mechanism with different tooling, and it belongs to the transform project's own contracts. <code class="mono">learn-analytics-engineering-with-phoebe</code> covers that side.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>The column-set diff on orders_daily</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Six steps. The first two are the monitor, the next two run it against nights 23 and 24 so you see both pages, and the last two are the parts that decide whether anybody keeps it switched on.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>1 · Snapshot the column set nightly.</strong> One append per table per night into the metrics table. Run it after the load, not before, or you snapshot yesterday's shape with today's date.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+insert into analytics.metrics_columns
+       (load_date, table_name, column_name, data_type, is_nullable, ordinal_position)
+select current_date,
+       table_schema || '.' || table_name,
+       column_name,
+       data_type,
+       is_nullable,
+       ordinal_position
+from information_schema.columns
+where table_schema = 'analytics'
+  and table_name  = 'orders_daily';
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>2 · Write the diff as two set differences.</strong> Both directions, reported separately, joined into one sentence. The <code class="mono">except</code> operator is the whole monitor.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with today as (
+  select column_name from analytics.metrics_columns
+  where table_name = 'analytics.orders_daily' and load_date = current_date
+),
+yday as (
+  select column_name from analytics.metrics_columns
+  where table_name = 'analytics.orders_daily' and load_date = current_date - 1
+),
+dropped as (select column_name from yday  except select column_name from today),
+added   as (select column_name from today except select column_name from yday)
+select (select count(*) from dropped) as n_dropped,
+       (select count(*) from added)   as n_added,
+       concat_ws('; ',
+         case when (select count(*) from dropped) > 0
+              then 'dropped ' || (select listagg(column_name, ', ') from dropped) end,
+         case when (select count(*) from added) > 0
+              then 'added '   || (select listagg(column_name, ', ') from added) end
+       ) as message;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>3 · Run it against night 23 and read the message.</strong> With <code class="mono">load_date</code> pinned to night 23 and its predecessor, the query returns <code class="mono">n_dropped = 1</code>, <code class="mono">n_added = 1</code> and the message <strong>"dropped ship_region; added promo_code"</strong>. Read that sentence out loud and decide whether you would page on it at 06:20. Then check whether any other monitor in your set fires on night 23. None of them do: the load was on time, the row count is normal, and the duplicate rate is at its baseline.</p>
+      </div>
+      <div class="step">
+        <p><strong>4 · Now run it against night 24.</strong> Same query, one night later. It returns <code class="mono">n_dropped = 1</code>, <code class="mono">n_added = 1</code> and <strong>"dropped promo_code; added ship_region"</strong>. Nothing is wrong on night 24. The upstream team fixed their release and the table is back to the shape it had on night 22. The monitor is correct and the page is unwanted, and that is the whole lesson of the session.</p>
+      </div>
+      <div class="step">
+        <p><strong>5 · Add the type and nullability diff.</strong> A full outer join on column name over the same two snapshots, catching the widening class that the set difference cannot see. Note the <code class="mono">!=</code> rather than a null-unsafe comparison, and the <code class="mono">coalesce</code> that stops a new or removed column producing a spurious type change.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with y as (
+  select column_name, data_type, is_nullable
+  from analytics.metrics_columns
+  where table_name = 'analytics.orders_daily' and load_date = current_date - 1
+),
+t as (
+  select column_name, data_type, is_nullable
+  from analytics.metrics_columns
+  where table_name = 'analytics.orders_daily' and load_date = current_date
+)
+select coalesce(t.column_name, y.column_name) as column_name,
+       y.data_type   as type_was,  t.data_type   as type_now,
+       y.is_nullable as nullable_was, t.is_nullable as nullable_now
+from y
+full outer join t on t.column_name = y.column_name
+where y.column_name is not null
+  and t.column_name is not null
+  and (coalesce(t.data_type, '')   != coalesce(y.data_type, '')
+    or coalesce(t.is_nullable, '') != coalesce(y.is_nullable, ''));
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>6 · Write the routing rule.</strong> The class decides the destination, and the class is already in the two counts you computed. An addition on its own goes to a channel somebody reads on Monday. A removal wakes the rota. A drop and an addition on the same night is a possible rename and gets its own wording so nobody escalates a rename as a data loss.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select case
+         when n_dropped > 0 and n_added > 0 then 'rota · possible rename'
+         when n_dropped > 0                 then 'rota · column removed'
+         when n_added   > 0                 then 'channel · column added'
+       end as route,
+       'analytics.orders_daily · ' || message as page_text
+from schema_diff
+where n_dropped + n_added > 0;
+        </div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>What the page should say.</strong> "orders_daily schema changed" makes the reader open a query editor. "orders_daily: dropped ship_region; added promo_code. ship_region appears in 2 dashboard filters and 1 export" makes the reader act, and the second clause is the one session 7 shows you how to generate.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 5</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Get the nightly column snapshot running for every table in one schema, not just the one you are monitoring. It is the same query with the table filter removed, and it is the cheapest piece of history you will ever collect.</li>
+      <li>Write down which of the three revert policies you are choosing, in one sentence, in the repo README. If you cannot decide, choose "a revert pages" and live with it for a month, because that policy costs nothing to maintain.</li>
+      <li>Add <code class="mono">data_type</code> and <code class="mono">is_nullable</code> to the snapshot and run the type diff over whatever history you already have. Most teams find at least one type change from the last quarter that nobody remembers happening.</li>
+      <li>Pick the three columns on your table that appear in a dashboard filter or a downstream join key and write them in the README. That list is the difference between a page that says "the shape changed" and a page that says who is about to be affected.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">The schema monitor pages on night 23 for a dropped column. On night 24 the upstream team reverts and the column set matches night 22 again. What does the monitor do?</p>
+      <button class="qopt" type="button">A · Nothing, because the shape now matches the last known-good snapshot</button>
+      <button class="qopt" type="button">B · It fires again, because a revert is also a difference between tonight and last night</button>
+      <button class="qopt" type="button">C · Nothing, because the same columns cannot be reported twice in one week</button>
+      <p class="qwhy">The diff compares consecutive nights, not tonight against a declared shape, so the rollback is a real difference and reads "dropped promo_code; added ship_region". Night 24 is one of the two false pages that survive at the top of the bench, and the fix is a policy decision rather than a better query.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">An integer column widens to numeric, and <code class="mono">status</code> starts carrying a value that no downstream case statement handles. Which of your checks sees it?</p>
+      <button class="qopt" type="button">A · The column-set diff, because the shape of the table changed</button>
+      <button class="qopt" type="button">B · The volume monitor, because dropped rows shrink the row count</button>
+      <button class="qopt" type="button">C · Neither is seen tonight: the column list is identical and nothing errors</button>
+      <p class="qwhy">This is the silently breaking class. The widening needs a second diff on <code class="mono">data_type</code>, and the new code value is not a schema change at all: the column list and the types are unchanged, which makes it a distribution question.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">You build one mart and you ingest three tables from another team. Where does a schema monitor earn the most?</p>
+      <button class="qopt" type="button">A · On the three ingested tables, because their changes arrive with no ticket and no review you were part of</button>
+      <button class="qopt" type="button">B · On your own mart, because you can fix that one yourself</button>
+      <button class="qopt" type="button">C · Equally on all four, because the diff query costs the same either way</button>
+      <p class="qwhy">On a table you build, the change is in a pull request you already saw. On a table somebody else produces, the shape of the data next morning is the first signal you get, and that is precisely the gap the monitor fills.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Column-set diff as a monitor</span>
+        <span class="note">Two set differences over a nightly snapshot, with the message naming what was dropped and what was added. Working SQL for both halves.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Additive, breaking and silently breaking</span>
+        <span class="note">All three classified with an example each, plus which checks see them. Type widening, timezone changes and a new code value are named as the expensive class.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The revert as a second page</span>
+        <span class="note">Night 24 fires because a rollback is a change. Three revert policies with their costs, and the routing rule that splits additions from removals.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">information_schema.columns as the snapshot source</span>
+        <span class="note">Names, types, nullability and ordinal position, appended nightly to the metrics table so the diff has something to compare against.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Model contracts and build-time schema enforcement</span>
+        <span class="note">Named here and handed to <code class="mono">learn-analytics-engineering-with-phoebe</code>, which owns assertions on tables you produce yourself.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Which downstream assets read a dropped column</span>
+        <span class="note">The message needs it and session 7 generates it, from lineage and the impact query.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">A change-management policy for upstream producers</span>
+        <span class="note">Not covered here. Negotiating notice periods and deprecation windows with a producing team is an operating-model question that belongs to the governance course.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 4 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Three classes</b><span>Additive, breaking, silently breaking. The loud one is cheap; the quiet one costs a week.</span></div>
+      <div class="cheat-item"><b>The monitor</b><span>Two <code class="mono">except</code> queries over last night and tonight, reported separately so the message names the class.</span></div>
+      <div class="cheat-item"><b>The revert pages too</b><span>Night 24 reads "dropped promo_code; added ship_region". True, and unwanted. Decide the policy first.</span></div>
+      <div class="cheat-item"><b>Snapshot, do not read live</b><span>information_schema has no yesterday. Append the column set nightly or the diff has nothing to compare.</span></div>
+      <div class="cheat-item"><b>Store types too</b><span>data_type and is_nullable catch the widening class. Normalise the type name or week one is all noise.</span></div>
+      <div class="cheat-item"><b>Renames look like loss</b><span>A drop plus an addition on one night is probably a rename. Say so in the message.</span></div>
+      <div class="cheat-item"><b>Route by class</b><span>Addition to a channel, removal to the rota. The two counts you already computed decide it.</span></div>
+      <div class="cheat-item"><b>Point it outward</b><span>Worth most on tables another team produces, where the data next morning is your first notification.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 4 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b3-volume-uniqueness.html">← Builder session 3 · Volume and uniqueness</a>
+      <a href="b5-distribution-drift.html">Builder session 5 · Distribution drift →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

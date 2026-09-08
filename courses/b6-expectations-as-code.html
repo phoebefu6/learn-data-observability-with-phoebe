@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 6 of 8. The Great Expectations Core component model in workflow order, the difference between an assertion about a batch and a comparison against history, and the pattern that makes both the same thing: point the suite at the metrics table.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Expectations as code - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 6 of 8. Data Context to Data Docs, and the one move that turns a history comparison into an ordinary expectation.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b6-expectations-as-code.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Expectations as code - learn data observability with phoebe">
+<meta name="twitter:description" content="An expectation passes or fails a batch. A monitor compares against history. Here is how to make them the same object.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 6 · Expectations as code - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 6 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 6 of 8</div>
+    <h1>Expectations <span class="accent">as code</span></h1>
+    <p class="sub">Five sessions of monitors written as scheduled queries. Tonight the same checks become versioned, reviewable objects in a framework, which buys you code review, a test-style run report and a page somebody else can read. It also exposes an honest limit: an expectation asks whether a batch is acceptable, and three of your monitors ask whether tonight looks like the last thirty nights. Those are different questions, and the fix is a single change of aim.</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Advanced</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · The component model</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: a checkpoint over the metrics table</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where the framework earns its place</h2>
+    </div>
+    <p class="lede">Sessions 2 to 5 built freshness, volume, uniqueness, schema and null-rate monitors as SQL on a schedule against <strong>analytics.orders_daily</strong> at Bellwether. That works, and it stops working the moment three people own the thresholds. Tonight the checks move into <strong>Great Expectations Core</strong>: the same arithmetic, expressed as objects that live in a repo, run from a single entry point and produce a readable result. Session 7 adds lineage, and session 8 scores the whole set against 30 nights of history.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A working Checkpoint that validates last night's row of the metrics table and notifies on failure. The twelve component names in the order you actually meet them, so the documentation stops feeling like a maze. And a written list of which monitors did not translate, which is the most useful artifact of the evening because it tells you what the framework is not for.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>What a framework buys over a scheduled query<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A scheduled query is the cheapest possible monitor and it has three failure modes that show up around month two. The threshold lives in a scheduler UI where nobody reviews it. The output is a row in a log, so a failure has to be explained by whoever wrote it. And the same check gets copied to a second table with one number edited, which is how two monitors on the same signal end up disagreeing.</p>
+        <p>A framework fixes exactly those three and nothing else. The assertion is a declared object, so a change to a threshold is a diff on a pull request. The run produces a structured result and a rendered page, so a failure is legible to the person who reads it at 07:00 rather than only to its author. And the assertion is separate from the data it points at, so one definition covers twenty tables.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether had a volume check in the warehouse scheduler and a nearly identical one in the orchestrator, set six months apart by two people. The scheduler one used a plus or minus 30 percent band, the orchestrator one used same-weekday medians. On the eight weekend nights of a 30-night window they disagreed, and the on-call learned to trust neither. Neither threshold had ever been reviewed by a second person, because neither lived anywhere a review happens.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What a framework does not buy<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>It does not choose your thresholds.</strong> An expectation with <code class="mono">max_value=32</code> is exactly as arbitrary as a scheduled query with the same number. The arithmetic from sessions 2 to 5 is still where the value is.</li>
+          <li><strong>It does not give you a rota.</strong> A failing validation is a result object until an Action puts it in front of a named human. That was part three of the monitor anatomy in session 1 and it is still not code.</li>
+          <li><strong>It does not model the channel.</strong> A framework will happily emit 25 notifications in 30 nights, and the muted channel that produces is the thing session 8 measures.</li>
+          <li><strong>It does not replace build-time tests.</strong> Row-level assertions inside a transform project are a different discipline with their own tooling, and that is what the analytics engineering track is for.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the Great Expectations Core component model end to end</span>
+      <h2>The Great Expectations component model</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">Twelve objects, and the reason there are twelve rather than three is that each one is deliberately reusable independently of the others. Met in workflow order they stop being a maze: you connect to data, you pick a slice of it, you say what should be true, and you run that and record what happened.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Great Expectations Core component model as a left-to-right pipeline in four stages. Stage one connects: Data Context, Data Source, Data Asset. Stage two chooses a batch: Batch Definition, Batch. Stage three states the rules: Expectation, Expectation Suite. Stage four runs and records: Validation Definition, Checkpoint. Validation Result, Actions and Data Docs branch off the Checkpoint.">
+        <style>
+          .b6aW { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b6aK { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b6aH { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .b6aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b6aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b6aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="b6aH" x="14" y="34">1 · Connect</text>
+        <text class="b6aH" x="236" y="34">2 · Choose a batch</text>
+        <text class="b6aH" x="458" y="34">3 · State the rules</text>
+        <text class="b6aH" x="680" y="34">4 · Run and record</text>
+
+        <rect x="14" y="50" width="186" height="130" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <rect x="236" y="50" width="186" height="94" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <rect x="458" y="50" width="186" height="94" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <rect x="680" y="50" width="186" height="94" rx="12" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+
+        <rect x="26" y="62" width="162" height="32" rx="7" fill="#BAE6FD" stroke="#38BDF8"></rect>
+        <text class="b6aK" x="107" y="83" text-anchor="middle">Data Context</text>
+        <rect x="26" y="100" width="162" height="32" rx="7" fill="#BAE6FD" stroke="#38BDF8"></rect>
+        <text class="b6aK" x="107" y="121" text-anchor="middle">Data Source</text>
+        <rect x="26" y="138" width="162" height="32" rx="7" fill="#BAE6FD" stroke="#38BDF8"></rect>
+        <text class="b6aK" x="107" y="159" text-anchor="middle">Data Asset</text>
+
+        <rect x="248" y="62" width="162" height="32" rx="7" fill="#38BDF8"></rect>
+        <text class="b6aK" x="329" y="83" text-anchor="middle">Batch Definition</text>
+        <rect x="248" y="100" width="162" height="32" rx="7" fill="#38BDF8"></rect>
+        <text class="b6aK" x="329" y="121" text-anchor="middle">Batch</text>
+
+        <rect x="470" y="62" width="162" height="32" rx="7" fill="#0369A1"></rect>
+        <text class="b6aW" x="551" y="83" text-anchor="middle">Expectation</text>
+        <rect x="470" y="100" width="162" height="32" rx="7" fill="#0369A1"></rect>
+        <text class="b6aW" x="551" y="121" text-anchor="middle">Expectation Suite</text>
+
+        <rect x="692" y="62" width="162" height="32" rx="7" fill="#075985"></rect>
+        <text class="b6aW" x="773" y="83" text-anchor="middle">Validation Definition</text>
+        <rect x="692" y="100" width="162" height="32" rx="7" fill="#075985"></rect>
+        <text class="b6aW" x="773" y="121" text-anchor="middle">Checkpoint</text>
+
+        <line x1="204" y1="112" x2="232" y2="112" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+        <line x1="426" y1="112" x2="454" y2="112" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+        <line x1="648" y1="112" x2="676" y2="112" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+
+        <line x1="773" y1="148" x2="773" y2="196" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="375" y1="196" x2="773" y2="196" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="375" y1="196" x2="375" y2="216" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+        <line x1="575" y1="196" x2="575" y2="216" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+        <line x1="773" y1="196" x2="773" y2="216" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6aAr)"></line>
+
+        <rect x="290" y="222" width="170" height="36" rx="8" fill="#0369A1"></rect>
+        <text class="b6aW" x="375" y="245" text-anchor="middle">Validation Result</text>
+        <text class="b6aM" x="375" y="274" text-anchor="middle">pass or fail, per Expectation</text>
+
+        <rect x="490" y="222" width="170" height="36" rx="8" fill="#F0F9FF" stroke="#0369A1"></rect>
+        <text class="b6aK" x="575" y="245" text-anchor="middle">Actions</text>
+        <text class="b6aM" x="575" y="274" text-anchor="middle">reaches a named human</text>
+
+        <rect x="688" y="222" width="170" height="36" rx="8" fill="#F0F9FF" stroke="#0369A1"></rect>
+        <text class="b6aK" x="773" y="245" text-anchor="middle">Data Docs</text>
+        <text class="b6aM" x="773" y="274" text-anchor="middle">legible to somebody else</text>
+
+        <rect x="14" y="292" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b6aN" x="38" y="304">One Expectation Suite runs against many Batch Definitions. That indirection is the reuse.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - four stages, and Actions plus Data Docs hang off the Checkpoint.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The twelve objects, one sentence each<span class="mini">5 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Read the table top to bottom once. That order is the order you write the code in, which is why it is worth learning as a sequence rather than as a glossary.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Component</th><th>What it is for</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Data Context</td><td>The entry point to the Python API, holding your configuration and metadata for everything else.</td></tr>
+            <tr><td>Data Source</td><td>Represents the platform or system your data lives in and carries the connection to it.</td></tr>
+            <tr><td>Data Asset</td><td>A collection of records within a Data Source: a table, a view or a query.</td></tr>
+            <tr><td>Batch Definition</td><td>Describes how records are retrieved from a Data Asset, whole table or partitioned by a column.</td></tr>
+            <tr><td>Batch</td><td>The records actually returned when a Batch Definition is resolved.</td></tr>
+            <tr><td>Expectation</td><td>A single verifiable assertion about data.</td></tr>
+            <tr><td>Expectation Suite</td><td>A collection of Expectations grouped together for a Data Asset.</td></tr>
+            <tr><td>Validation Definition</td><td>Pairs an Expectation Suite with a Batch Definition, so it names what to check against which data.</td></tr>
+            <tr><td>Validation Result</td><td>The output of running a Validation Definition, reporting success or failure for each Expectation.</td></tr>
+            <tr><td>Checkpoint</td><td>Runs one or more Validation Definitions and triggers Actions on the results.</td></tr>
+            <tr><td>Actions</td><td>What happens after validation, such as sending a notification or refreshing Data Docs.</td></tr>
+            <tr><td>Data Docs</td><td>Human-readable documentation rendered from Validation Results.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why the indirection exists<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The first reaction to twelve objects is that four would do. The reason there are twelve is that the seams are placed exactly where teams need to vary one thing without touching the others.</p>
+        <ul>
+          <li><strong>Expectation Suite is separate from Batch Definition</strong> so the same suite runs against many slices. One nightly-metrics suite covers every tier 1 table you instrument, because the assertions are about the shape of a metrics row rather than about a specific table.</li>
+          <li><strong>Validation Definition is the join</strong> between the two. It is the only object that knows both, which means moving a suite from staging to production is a new Validation Definition rather than an edited suite.</li>
+          <li><strong>Checkpoint is separate from Validation Definition</strong> so scheduling and notification live in one place. Ten validations, one Checkpoint, one set of Actions, one thing your orchestrator calls.</li>
+          <li><strong>Data Source is separate from Data Asset</strong> so a credential rotation touches one object. This is the seam that saves you on the day the warehouse password changes.</li>
+        </ul>
+        <div class="callout tip">
+          <p><strong>The test for whether you have used the seams.</strong> Adding a twelfth table to your monitoring should be one new Batch Definition and one new Validation Definition, with the suite untouched. If it is a copied suite with the table name edited, you have twelve sources of truth and the next threshold change will miss some of them.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The version caveat, stated plainly<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Great Expectations moves fast, and component names have changed across major versions. The docs read for this material were <strong>version 1.22.0</strong> of Great Expectations Core, and the twelve names above are the ones that version uses. Older material will show objects that no longer exist under those names, and code written against a 0.x release does not run unchanged.</p>
+        <p>So the working rule, which costs two minutes and saves an afternoon: open the current documentation for the exact version in your lockfile before you teach this to anybody or deploy it anywhere. Pin the version in your dependency file rather than tracking latest, and treat an upgrade as a change that needs its own pull request rather than something a resolver does for you overnight.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>The single most common way this bites is a copied snippet. A blog post from a previous major version reads as perfectly sensible, the object names look plausible, and the failure is an import error at best or a silently different default at worst. Check the version stamp on any snippet before you paste it, and if there is no version stamp, treat the snippet as a sketch of the idea rather than as code.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the boundary between an assertion and a comparison</span>
+      <h2>Expectations versus monitors</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">This is the distinction that decides how much of your monitor set can live in a framework at all. An <strong>expectation</strong> is an assertion about a batch: it looks at the records in front of it and passes or fails. A <strong>monitor</strong> is a comparison against the table's own history: it needs the last thirty nights to say anything at all. Neither is better. They answer different questions, and confusing them is how people conclude that a validation framework "cannot do freshness".</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two paths compared. In the first, an expectation pointed at orders_daily gets a batch of one night and cannot see the trailing p95 it needs, so the assertion cannot be written. In the second, the same expectation is pointed at the metrics table, where the trailing p95 is already a stored column in last night's row, and the check becomes an ordinary assertion.">
+        <style>
+          .b6bW { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b6bK { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .b6bH { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .b6bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b6bR { font: 700 12px Inter, sans-serif; fill: #991B1B; }
+          .b6bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b6bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="b6bH" x="14" y="28">1 · Suite pointed at orders_daily</text>
+
+        <rect x="14" y="42" width="150" height="56" rx="9" fill="#075985"></rect>
+        <text class="b6bW" x="89" y="66" text-anchor="middle">orders_daily</text>
+        <text class="b6bM" x="89" y="84" text-anchor="middle" fill="#BAE6FD">rows, not history</text>
+
+        <rect x="200" y="42" width="170" height="56" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b6bK" x="285" y="66" text-anchor="middle">Batch: one night</text>
+        <text class="b6bM" x="285" y="84" text-anchor="middle">12,004 rows</text>
+
+        <rect x="406" y="42" width="190" height="56" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b6bK" x="501" y="66" text-anchor="middle">Expectation needs p95</text>
+        <text class="b6bM" x="501" y="84" text-anchor="middle">of the last 30 nights</text>
+
+        <rect x="632" y="42" width="190" height="56" rx="9" fill="#F0F9FF" stroke="#991B1B"></rect>
+        <text class="b6bR" x="727" y="66" text-anchor="middle">p95 is not in the batch</text>
+        <text class="b6bM" x="727" y="84" text-anchor="middle">assertion cannot be made</text>
+
+        <line x1="168" y1="70" x2="196" y2="70" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+        <line x1="374" y1="70" x2="402" y2="70" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+        <line x1="600" y1="70" x2="628" y2="70" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+
+        <text class="b6bM" x="14" y="122">History lives in 29 other nights that this Batch does not contain.</text>
+
+        <line x1="14" y1="142" x2="866" y2="142" stroke="#C3D4E0" stroke-width="1"></line>
+
+        <text class="b6bH" x="14" y="168">2 · Suite pointed at the metrics table</text>
+
+        <rect x="14" y="182" width="150" height="56" rx="9" fill="#075985"></rect>
+        <text class="b6bW" x="89" y="206" text-anchor="middle">metrics table</text>
+        <text class="b6bM" x="89" y="224" text-anchor="middle" fill="#BAE6FD">1 row per night</text>
+
+        <rect x="200" y="182" width="170" height="56" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b6bK" x="285" y="206" text-anchor="middle">Batch: last night</text>
+        <text class="b6bM" x="285" y="224" text-anchor="middle">exactly one row</text>
+
+        <rect x="406" y="182" width="190" height="56" rx="9" fill="#38BDF8"></rect>
+        <text class="b6bK" x="501" y="206" text-anchor="middle">p95 is a column</text>
+        <text class="b6bM" x="501" y="224" text-anchor="middle" fill="#0C1B26">written when the row lands</text>
+
+        <rect x="632" y="182" width="190" height="56" rx="9" fill="#0369A1"></rect>
+        <text class="b6bW" x="727" y="206" text-anchor="middle">Ordinary assertion</text>
+        <text class="b6bM" x="727" y="224" text-anchor="middle" fill="#BAE6FD">column A greater than B</text>
+
+        <line x1="168" y1="210" x2="196" y2="210" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+        <line x1="374" y1="210" x2="402" y2="210" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+        <line x1="600" y1="210" x2="628" y2="210" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b6bAr)"></line>
+
+        <text class="b6bM" x="14" y="262">The comparison is precomputed, so the Expectation only ever reads one row.</text>
+
+        <rect x="14" y="292" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b6bN" x="38" y="304">Same question, two aims. The metrics table turns history into a column.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - aim at the metrics table and a history comparison becomes an assertion.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Which of the five signals fit as expectations<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Sort your checks by what they need in order to answer. Anything answerable from the records in front of you fits an expectation natively. Anything that needs the table's own past does not, until you feed the past in as the batch.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Check</th><th>Needs</th><th>Fits an expectation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Validity: a column is one of a known set</td><td>The batch only</td><td>Yes, natively</td></tr>
+            <tr><td>Range: a value sits between two bounds</td><td>The batch only</td><td>Yes, natively</td></tr>
+            <tr><td>Set membership: currency, status, region code</td><td>The batch only</td><td>Yes, natively</td></tr>
+            <tr><td>Uniqueness: the key does not repeat</td><td>The batch only</td><td>Yes, natively</td></tr>
+            <tr><td>Freshness against a trailing p95</td><td>Thirty nights of lateness</td><td>Only via the metrics table</td></tr>
+            <tr><td>Volume against a same-weekday median</td><td>Four prior same weekdays</td><td>Only via the metrics table</td></tr>
+            <tr><td>Schema diff against last night's column set</td><td>Last night's column list</td><td>Only via the metrics table</td></tr>
+            <tr><td>Null rate against a trailing mean plus 3 sd</td><td>Thirty nights of null rates</td><td>Only via the metrics table</td></tr>
+          </tbody>
+        </table>
+        <p>The top four are the ones a validation framework was designed for, and they are genuinely valuable: a hard <code class="mono">accepted_values</code> assertion on a region code catches a class of upstream change that no metadata monitor sees. The bottom four are what sessions 2 to 5 were actually about, and they are comparisons.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Point the suite at the metrics table<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The move is one line of aim and it resolves the whole tension. Instead of a Data Asset over <code class="mono">analytics.orders_daily</code>, build the Data Asset over <code class="mono">analytics.obs_metrics</code>, the one-row-per-table-per-night table from session 1. Last night's row is a Batch of exactly one record, and every trailing comparison you need is a column in it.</p>
+        <p>That works only if the row carries the comparison as well as the measurement. When you write tonight's row, write the reference values alongside it: the trailing p95 of lateness plus the pad, the same-weekday median of row count, last night's column-set signature. Then "lateness is within budget" is <code class="mono">late_budget_minutes</code> greater than <code class="mono">late_minutes</code>, which is an ordinary column-pair assertion about a single row.</p>
+        <ul>
+          <li><strong>Store the reference, not just the reading.</strong> A metrics row of eight raw numbers cannot be validated without history. The same row plus three precomputed reference columns can.</li>
+          <li><strong>The arithmetic does not move, it relocates.</strong> The percentile and the median are still computed in SQL, once per night, in the job that writes the row. The framework validates rather than calculates.</li>
+          <li><strong>One suite covers every table.</strong> Because the assertions are about the shape of a metrics row, the same Expectation Suite validates orders_daily, orders_items and every other instrumented table. That is the reuse the component seams were built for.</li>
+          <li><strong>The failure message improves.</strong> A Validation Result on a metrics row says which reference value was breached and by how much, which is the sentence you wanted in the incident channel in session 1.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Actions and Data Docs: the parts that reach people<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A Validation Result is an object in memory. Nothing about a failing validation reaches a human until an Action does it, and this is the same gap that made a monitor without a destination into a chart that changes colour.</p>
+        <ul>
+          <li><strong>Actions run after validation, on the result.</strong> A notification Action on failure is the minimum viable destination. Configure it to fire on failure only, because an Action that posts on every successful night is how a channel gets muted in week two.</li>
+          <li><strong>Data Docs is the legibility layer.</strong> It renders Validation Results as browsable pages: which Expectations ran, which failed, what the observed value was against the expected one. The audience is the analyst who was told the revenue number is wrong and wants to see the evidence without reading your Python.</li>
+          <li><strong>Host the docs somewhere durable.</strong> Docs rendered onto the laptop of whoever ran the Checkpoint are not an artifact. A static bucket behind the same auth as your BI tool is enough, and the link belongs in the notification.</li>
+          <li><strong>The notification and the docs do different jobs.</strong> The notification carries the number and the link. The docs carry the detail. Putting the detail in the notification is how people learn to scroll past it.</li>
+        </ul>
+        <div class="callout tip">
+          <p><strong>Write the notification text yourself.</strong> A default template says a suite failed. What the reader needs is the table, the signal, the observed value, the reference value and the blast radius: "orders_daily landed 230 min past the 06:00 promise, budget is 32 min, 3 dashboards and the finance export read it". Same Validation Result, different Monday.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>A checkpoint over the metrics table</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Nine steps, in the order the components appear. Bring the metrics table you started in session 1. If you have nothing recording yet, the reference columns are easy to fake for one night and the shape is what matters. Python throughout, with the reference values computed in SQL by the job that writes the row.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>1. Write the reference columns into the metrics row.</strong> Before any framework code, make sure tonight's row carries its own comparisons. Three extra columns, computed in the same statement that writes the row.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+insert into analytics.obs_metrics
+select
+  'analytics.orders_daily'                       as table_name,
+  current_date                                   as load_date,
+  m.rows, m.distinct_keys, m.max_updated_at,
+  m.late_minutes, m.null_rate_customer, m.column_count,
+  -- reference columns: the comparison, precomputed
+  h.p95_late + 10                                as late_budget_minutes,
+  m.rows / h.median_rows_same_weekday::float     as rows_ratio_wd,
+  1 - m.distinct_keys / m.rows::float            as dup_rate
+from tonight m cross join trailing_history h;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>2. Get a Data Context.</strong> File mode keeps the configuration in a directory you can commit, which is the point of moving the thresholds into a repo in the first place.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+import great_expectations as gx
+from great_expectations import expectations as gxe
+
+context = gx.get_context(mode="file", project_root_dir="./gx")
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>3. Define the Data Source and the Data Asset.</strong> The Data Source carries the connection. The Data Asset is the metrics table, not orders_daily, and that choice is the whole session.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+source = context.data_sources.add_postgres(
+    name="warehouse",
+    connection_string="${WAREHOUSE_CONNECTION_STRING}",
+)
+
+asset = source.add_table_asset(
+    name="obs_metrics",
+    schema_name="analytics",
+    table_name="obs_metrics",
+)
+        </div>
+        <p>The connection string is read from an environment variable through the Data Context, so no credential lands in the committed configuration. Rotating it touches this one object.</p>
+      </div>
+      <div class="step">
+        <p><strong>4. Add a Batch Definition for last night's row.</strong> Partition the asset daily on <code class="mono">load_date</code>. The Batch Definition is a reusable description; it does not hold a date.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+nightly = asset.add_batch_definition_daily(
+    name="one_night", column="load_date"
+)
+
+batch = nightly.get_batch(
+    batch_parameters={"year": 2026, "month": 9, "day": 5}
+)
+print(batch.head())
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>5. Build the Expectation Suite: three Expectations, all of them ordinary.</strong> Lateness inside the stored budget, row count inside 25 percent of the stored same-weekday median, duplicate rate under 2 percent. The thresholds are the ones sessions 2 to 4 derived, and they now live in a file somebody can review.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+suite = context.suites.add(
+    gx.ExpectationSuite(name="nightly_metrics_row")
+)
+
+# freshness: budget column beats the reading, per session 2
+suite.add_expectation(
+    gxe.ExpectColumnPairValuesAToBeGreaterThanB(
+        column_A="late_budget_minutes",
+        column_B="late_minutes",
+        or_equal=True,
+    )
+)
+
+# volume: within 25 percent of the same-weekday median, per session 3
+suite.add_expectation(
+    gxe.ExpectColumnValuesToBeBetween(
+        column="rows_ratio_wd", min_value=0.75, max_value=1.25
+    )
+)
+
+# uniqueness: duplicate rate under 2 percent, per session 3
+suite.add_expectation(
+    gxe.ExpectColumnValuesToBeBetween(
+        column="dup_rate", min_value=0.0, max_value=0.02
+    )
+)
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>6. Pair them with a Validation Definition.</strong> One object, two references. This is the only place that knows both which suite and which slice, which is why promoting from staging to production is a second Validation Definition rather than an edited suite.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+validation = context.validation_definitions.add(
+    gx.ValidationDefinition(
+        name="orders_daily_nightly",
+        suite=suite,
+        data=nightly,
+    )
+)
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>7. Wrap it in a Checkpoint with an Action.</strong> The Checkpoint is what your orchestrator calls. The Action is what makes a failure reach a human, and <code class="mono">notify_on="failure"</code> is the setting that keeps the channel alive.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+from great_expectations.checkpoint import (
+    SlackNotificationAction,
+    UpdateDataDocsAction,
+)
+
+checkpoint = context.checkpoints.add(
+    gx.Checkpoint(
+        name="orders_daily_checkpoint",
+        validation_definitions=[validation],
+        actions=[
+            SlackNotificationAction(
+                name="page_the_rota",
+                slack_webhook="${OBS_SLACK_WEBHOOK}",
+                notify_on="failure",
+            ),
+            UpdateDataDocsAction(name="refresh_docs"),
+        ],
+        result_format="COMPLETE",
+    )
+)
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>8. Run it and read the Validation Result.</strong> Then run it again against night 9, which landed 230 minutes past the 06:00 promise against a trailing p95 of 22 minutes, so a budget of 32. Read what the result says about the observed value, not just that it failed.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+result = checkpoint.run(
+    batch_parameters={"year": 2026, "month": 9, "day": 5}
+)
+
+print(result.success)
+for run in result.run_results.values():
+    for r in run["results"]:
+        if not r["success"]:
+            print(r["expectation_config"]["type"],
+                  r["result"])
+
+context.build_data_docs()
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>9. Write down what did not translate, and why.</strong> Two of your sessions 2 to 5 monitors do not become Expectations tonight even with the metrics table in play, and one of them never will. Being explicit about this is worth more than the working Checkpoint.</p>
+        <ul>
+          <li><strong>Schema diff.</strong> An Expectation can assert that the column count equals a stored reference, or that a column-set signature matches last night's. What it cannot produce is the diff itself: which column left and which arrived. The alert needs "ship_region dropped, promo_code added", and that sentence comes from set arithmetic in SQL, not from a pass or fail. Keep the diff query and let the Expectation carry only the tripwire.</li>
+          <li><strong>Null rate against a trailing mean plus 3 standard deviations.</strong> Translates only if you write the band into the row as two more reference columns, and then the honest reading is that the framework is validating a threshold your SQL computed. Worth doing for the review trail; do not mistake it for the framework doing the statistics.</li>
+          <li><strong>The revert.</strong> Session 4's finding that a rollback pages too is a policy decision about whether a change back is a change. No Expectation encodes that, and the bench in session 8 counts night 24 as a false page precisely because the answer is arguable.</li>
+          <li><strong>The channel.</strong> Nothing in the component model knows whether anybody read the notification. An Action fires and returns success. Alert fatigue is a property of the humans and the rota, which is why session 8 models it rather than measuring it.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The result to aim for after 20 minutes.</strong> One Checkpoint, three Expectations, one notification Action, one hosted Data Docs page, and a four-line note in the repo README saying which two monitors stayed in SQL and why. The note is the part a future maintainer needs, because the obvious question in six months is why there are checks in two places.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 7</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Pin the Great Expectations version in your dependency file and open the documentation for that exact version. Note any component name on this page that differs from what you read, because the release cadence means it will eventually.</li>
+      <li>Get the three reference columns writing into your metrics row every night. Without them the suite has nothing to assert against, and this is the step people skip.</li>
+      <li>Point the same Expectation Suite at a second table's metrics rows using only a new Batch Definition and a new Validation Definition. If you had to edit the suite, find out why and fix the seam.</li>
+      <li>Host Data Docs somewhere a colleague can open, then send the link to one person who is not on your team and ask them what they think it says. Whatever they answer is the real legibility of your monitoring.</li>
+      <li>Write the notification text by hand for one failing Expectation. Table, signal, observed, reference, who reads it. Session 7 gives you the last part of that sentence properly.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Which component pairs an Expectation Suite with a Batch Definition?</p>
+      <button class="qopt" type="button">A · The Checkpoint, because it is what actually runs</button>
+      <button class="qopt" type="button">B · The Data Asset, because it knows both the table and the rules</button>
+      <button class="qopt" type="button">C · The Validation Definition, which names what to check against which data</button>
+      <p class="qwhy">The Validation Definition is the join, and it is the only object that knows both. A Checkpoint runs one or more Validation Definitions and triggers Actions on the results, which is a separate job.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Why can a freshness check against a trailing p95 not be written as an ordinary Expectation over <code class="mono">orders_daily</code>?</p>
+      <button class="qopt" type="button">A · Because timestamps cannot be compared inside an Expectation</button>
+      <button class="qopt" type="button">B · Because the p95 is computed from 30 nights, and a Batch of one night does not contain them</button>
+      <button class="qopt" type="button">C · Because freshness has to run more often than a Checkpoint can be scheduled</button>
+      <p class="qwhy">An Expectation asserts something about the records in front of it. Aim the Data Asset at the metrics table instead, where the trailing p95 is a stored column in last night's row, and the same check becomes an ordinary column-pair assertion.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A schema monitor is moved into the framework as an Expectation that the column-set signature matches last night's. What is lost?</p>
+      <button class="qopt" type="button">A · The diff itself, so the alert can say something changed but not that ship_region left and promo_code arrived</button>
+      <button class="qopt" type="button">B · Nothing, because a signature match is equivalent to a diff</button>
+      <button class="qopt" type="button">C · The ability to run the check nightly, since signatures need a full history</button>
+      <p class="qwhy">A pass or fail is a tripwire. The sentence the on-call needs names the columns, and that comes from set arithmetic in SQL. Keep the diff query and let the Expectation carry the tripwire only.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Great Expectations Core component model, read from the official documentation</span>
+        <span class="note">All twelve components in workflow order with the documented purpose of each. Docs version read: 1.22.0. Names have changed across major versions, so confirm against the version in your lockfile.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Great Expectations Core end to end, wired to the metrics table</span>
+        <span class="note">Data Context through Checkpoint, Actions and Data Docs, with three working Expectations over a metrics row and the reference columns that make them possible.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The boundary between an assertion and a history comparison</span>
+        <span class="note">Which of the five signals fit natively, which need the metrics table, and the two that stay in SQL with the reason written down.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Soda, Elementary and the wider expectations-as-code category</span>
+        <span class="note">Named as a category with the same component question to ask of each: where does history live, and what reaches a human. Leader session 6 covers platform selection without product scorecards.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">dbt data tests as build-time assertions</span>
+        <span class="note">Referenced in session 1 as one of the three homes for a check. The generic and singular test model belongs to the analytics engineering track.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Alert routing, rotas and on-call tooling</span>
+        <span class="note">Not covered by design. An Action reaches a webhook; who answers it and when is an operating question, and session 8 measures what happens when nobody does.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 6 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Workflow order</b><span>Data Context, Data Source, Data Asset, Batch Definition, Batch, Expectation, Expectation Suite, Validation Definition, Validation Result, Checkpoint, Actions, Data Docs.</span></div>
+      <div class="cheat-item"><b>The join</b><span>Validation Definition is the only object that knows both a Suite and a Batch Definition. That is what makes a Suite reusable.</span></div>
+      <div class="cheat-item"><b>Expectation vs monitor</b><span>An Expectation asserts about a batch and passes or fails. A monitor compares against the table's own history.</span></div>
+      <div class="cheat-item"><b>The one move</b><span>Aim the Data Asset at the metrics table. Trailing p95 becomes a column, and the check becomes an ordinary assertion.</span></div>
+      <div class="cheat-item"><b>Store the reference</b><span>Write late_budget_minutes, rows_ratio_wd and dup_rate into the row. Eight raw numbers cannot be validated alone.</span></div>
+      <div class="cheat-item"><b>Actions</b><span>Notify on failure only. An Action that posts every green night is how a channel gets muted in week two.</span></div>
+      <div class="cheat-item"><b>Data Docs</b><span>Host it where a colleague can open it. Docs on your laptop are not an artifact.</span></div>
+      <div class="cheat-item"><b>Version discipline</b><span>Docs read here were 1.22.0. Pin the version, treat an upgrade as its own pull request, distrust unstamped snippets.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 6 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b5-distribution-drift.html">← Builder session 5 · Distribution drift</a>
+      <a href="b7-lineage-blast-radius.html">Builder session 7 · Lineage and blast radius →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

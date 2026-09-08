@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 5 of 6. Monitoring every table equally is both unaffordable and counterproductive. Three tiers, three service levels, a tier 3 promise written down on purpose, and the export that quietly belongs a tier up.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Coverage without headcount - learn data observability with phoebe">
+<meta property="og:description" content="Leader session 5 of 6. Full coverage was never the goal. Tier the estate, buy detection where damage lives, and write down what the long tail does not get.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/a5-coverage-without-headcount.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Coverage without headcount - learn data observability with phoebe">
+<meta name="twitter:description" content="Three tiers, three service levels, and the reverse-ETL table that reorders most tier lists.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 5 · Coverage without headcount - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Leader session 5 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Leader session 5 of 6</div>
+    <h1>Coverage without <span class="accent">headcount</span></h1>
+    <p class="sub">The first budget request for observability almost always asks for the same thing: cover everything. It is the wrong ask, and not only because of the invoice. Monitoring 340 tables at the same service level spends the team's whole tolerance for false alarms on tables nobody reads, which means the six that matter arrive into a channel that has already been muted. Tonight you tier Bellwether's estate, set three honest service levels, and find the one table that looks quiet and is not.</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Advanced</span>
+      <span class="chip audience">Data and analytics leaders</span>
+      <span class="chip audience">Platform owners</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-22 · Tiering, and why full coverage is the wrong goal</span>
+      <span class="a3" style="flex:4">22-40 · Build-along: tier your estate</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where this sits in the leader track</h2>
+    </div>
+    <p class="lede">Six sessions, 45 minutes each, and one deliverable: a page you can hand to whoever funds this. Session 1 put a number on the discovery gap, session 2 named the five signals, session 3 turned quality into three chosen dimensions and session 4 priced a false page. Tonight is the money question: how far does a small team's attention stretch, and what do you deliberately leave uncovered. Session 6 turns the answer into three reportable numbers and a 90-day plan. The estate throughout is Bellwether's, a grocery delivery company with 340 tables in the warehouse and two people who could plausibly carry a pager.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A tier list for your own estate, built from four questions rather than from who complained most recently. Three written service levels, including the one that says out loud what the long tail does not get. And the check that reorders most tier lists in the room: which of your quiet tables feeds something a customer, a regulator or a payment run can see.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>The shape of the problem, in one paragraph<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Detection is bought with two currencies. One is money, and it is the smaller of the two: a metadata check on a table costs a fraction of a cent to run and the invoice only becomes interesting when checks start reading rows. The other currency is human attention, and it does not scale at all. A rota of two people can hold a few dozen tables in their heads and answer a page about them at 07:00 with some idea of what to do. It cannot hold 340.</p>
+        <p>So the real constraint on coverage is not the tooling budget. It is the number of tables about which somebody can be woken and still be useful. Every tiering decision below is an argument about how to spend that number.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's first attempt turned freshness and volume on for all 340 tables at one fixed threshold. The first week produced 40-odd alerts. Three were real. By the second Friday the channel had been muted by everybody except the analyst who had built it, and when a genuine partial load hit the orders table it was still finance who found it on the Monday.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The vocabulary you need for the tier conversation<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>Tier</strong> - a promise about a table, not a description of it. Two tables with identical schemas can sit in different tiers because different things happen when they are wrong.</li>
+          <li><strong>Service level</strong> - what a tier gets: which signals are watched, in which hours, and how fast detection is expected to be. Written down, dated, and reviewed.</li>
+          <li><strong>Detection target</strong> - the honest promise. Minutes, hours or days. A tier with no stated target is a tier nobody can hold you to and nobody can plan around.</li>
+          <li><strong>Downstream reader count</strong> - how many models, dashboards, exports and jobs read this table. A good first proxy for damage and a bad last word on it.</li>
+          <li><strong>Blast radius</strong> - everything that breaks when this table is wrong, including the paths nobody documented. Builder session 7 builds the graph that answers this properly.</li>
+          <li><strong>Rota capacity</strong> - the number of tier 1 tables your named humans can actually carry. The hard ceiling on the whole plan.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers why equal coverage fails and the criteria that predict damage</span>
+      <h2>Full coverage is not the goal and never was</h2>
+      <span class="tag concept">10 min live</span>
+    </div>
+    <p class="lede">There is a version of this practice that fails in a predictable way: somebody wins the budget, switches monitoring on estate-wide, and six weeks later the reported coverage number is excellent and the detection number has not moved. It fails because coverage and detection are not the same thing, and equal coverage actively works against detection.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A three-tier pyramid. A small top band is tier 1 with all five signals, learned thresholds, a named rota and a target of minutes to detect. A wider middle band is tier 2 with freshness and volume in business hours and a target of hours. The widest bottom band is tier 3 with a nightly heartbeat only and a target of days, accepted in writing.">
+        <style>
+          .a5aT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .a5aTi { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a5aS { font: 400 11px Inter, sans-serif; fill: #BAE6FD; }
+          .a5aSi { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a5aH { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .a5aB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a5aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="a5aH" x="14" y="24">Three tiers, sized to the rota that carries them</text>
+        <text class="a5aB" x="14" y="42">width is table count, not importance</text>
+
+        <rect x="135" y="58" width="130" height="60" rx="8" fill="#075985"></rect>
+        <text class="a5aT" x="200" y="84" text-anchor="middle">Tier 1</text>
+        <text class="a5aS" x="200" y="104" text-anchor="middle">about 5 tables</text>
+
+        <rect x="90" y="126" width="220" height="76" rx="8" fill="#0369A1"></rect>
+        <text class="a5aT" x="200" y="158" text-anchor="middle">Tier 2</text>
+        <text class="a5aS" x="200" y="178" text-anchor="middle">about 30 tables</text>
+
+        <rect x="40" y="210" width="320" height="96" rx="8" fill="#BAE6FD"></rect>
+        <text class="a5aTi" x="200" y="248" text-anchor="middle">Tier 3</text>
+        <text class="a5aSi" x="200" y="270" text-anchor="middle">the other 300 tables</text>
+
+        <line x1="368" y1="88" x2="392" y2="88" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="368" y1="164" x2="392" y2="164" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="368" y1="258" x2="392" y2="258" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <rect x="396" y="58" width="470" height="60" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a5aH" x="412" y="82">All five signals · thresholds learned from history</text>
+        <text class="a5aB" x="412" y="102">Named rota, in hours and out · target: minutes to detect</text>
+
+        <rect x="396" y="126" width="470" height="76" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a5aH" x="412" y="152">Freshness and volume only</text>
+        <text class="a5aB" x="412" y="172">Business hours · target: hours to detect</text>
+        <text class="a5aB" x="412" y="192">One shared queue, triaged the same morning</text>
+
+        <rect x="396" y="210" width="470" height="96" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a5aH" x="412" y="236">A nightly heartbeat and nothing else</text>
+        <text class="a5aB" x="412" y="256">No rota, no page · target: days to detect</text>
+        <text class="a5aB" x="412" y="276">Accepted in writing, by a named owner, reviewed quarterly</text>
+        <text class="a5aB" x="412" y="296">A table that gets noticed here gets promoted, not patched</text>
+
+        <rect x="14" y="332" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a5aN" x="38" y="344">Tier 1 stays small on purpose. A rota carrying 60 tier 1 tables carries none of them.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the top band is small because the rota is small.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why equal coverage is worse than partial coverage<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Two separate costs, and the second one is the one that kills the practice.</p>
+        <ul>
+          <li><strong>It is unaffordable in attention, even when it is affordable in money.</strong> Every monitored table needs a threshold that somebody set, a threshold that somebody re-tunes when the table changes shape, and a human who knows what to do when it fires. Multiply that by 340 and you have described a team you do not have. The monitors that nobody maintains do not sit still: they drift into noise, because tables change and guessed thresholds do not.</li>
+          <li><strong>It spends the false-page budget on tables nobody reads.</strong> A team tolerates a small number of false alarms a week before it stops treating the channel as real. That tolerance is a fixed, shared resource across the whole estate. Spend it on a staging table that three people have ever queried and it is gone by the time the payments table needs it. This is the mechanism behind every muted alert channel you have inherited: not too few monitors, too many on the wrong tables.</li>
+        </ul>
+        <p>Which gives the operating principle for the rest of the session. You are not trying to watch everything. You are trying to spend a fixed and rather small amount of human attention where being wrong actually costs something.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The four questions that predict damage<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Tiering conversations go wrong when they are run on importance, because everybody's table is important and the loudest stakeholder wins. Run them on damage instead, and damage is answerable with four questions that anybody can answer about their own table in a minute.</p>
+        <ul>
+          <li><strong>Does a decision or a payment depend on it?</strong> Money moving, prices changing, a supplier being paid, a shift being staffed. If being wrong here changes what somebody does with money, it is a candidate for the top tier regardless of how few readers it has.</li>
+          <li><strong>Does an external party see it?</strong> A customer, a partner, a regulator, an auditor. External visibility converts a data problem into a trust problem, and trust problems cost far more than the fix.</li>
+          <li><strong>How many downstream assets read it?</strong> Models, dashboards, exports, reverse-ETL jobs. This is the cheapest of the four to compute because your warehouse or catalogue can usually tell you, and it is a proxy rather than an answer: high reader count means wide blast radius, low reader count means nothing at all.</li>
+          <li><strong>How fast would anybody notice on their own?</strong> The honest one. A table feeding a dashboard that three people open every morning has a human monitor already. A table feeding a quarterly regulatory extract has nobody, and a defect there sits undisturbed for weeks.</li>
+        </ul>
+        <p>Two of those four questions are about damage and two are about detection. Both halves matter: a table where the damage is large and somebody would notice in ten minutes anyway is a worse investment than a table where the damage is moderate and nobody would notice until the quarter closed.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's most-read table was a customer dimension with 60 downstream readers, and it scored badly on the fourth question: it feeds every dashboard in the company, so a defect gets reported by a human within the hour. Their worst exposure was a supplier terms table with two readers, feeding a monthly payment run, where nobody would have noticed until money left the building.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>A small number of tables carries nearly all the risk<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The pattern is consistent enough to plan around and worth stating honestly rather than as a statistic. In most warehouses, a small minority of tables sits underneath almost all of the decisions, the money and the external reporting. The rest is intermediate models, staging copies, abandoned experiments and one-off extracts that somebody built for a project that ended.</p>
+        <p>The exact share varies by estate and anybody quoting you a precise percentage for your warehouse has not looked at it. What does not vary is the shape: the distribution of damage across tables is steep, not flat. That is the whole reason tiering works. If damage were evenly spread, equal coverage would be the right answer and this session would not exist.</p>
+        <p>The good news is the cost of finding out. This is a morning of work, not a project, and it does not need a catalogue purchase:</p>
+        <ul>
+          <li><strong>Reader counts</strong> come from your transform project's dependency graph or from the warehouse's query history. One query, sorted descending.</li>
+          <li><strong>Money and external paths</strong> come from asking finance and whoever owns customer-facing reporting which tables they depend on. Two conversations, twenty minutes each, and they will name the same handful.</li>
+          <li><strong>The noticing question</strong> comes from the incident history you already have, even if it lives in a chat channel rather than a tracker. Which tables have ever generated a complaint, and how long did it take.</li>
+        </ul>
+        <p>What takes a project is maintaining the list once it exists, which is why the approval rule in part 2 matters more than the first pass does.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the three service levels and the promotion trap</span>
+      <h2>Three tiers, three service levels</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">Three tiers is the right number for most estates, because two cannot express "watched but not paged" and four produces a boundary nobody can define. What makes a tier real is not its name but its written service level: which signals, which hours, and how fast detection is promised to be.</p>
+
+    <table class="clean">
+      <thead>
+        <tr><th>Tier</th><th>Signals watched</th><th>Response window</th><th>Detection target</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Tier 1</strong> · decisions, money, external eyes</td><td>All five: freshness, volume, uniqueness, schema, distribution. Thresholds learned from the table's own history</td><td>A named rota, in hours and out of hours</td><td>Minutes</td></tr>
+        <tr><td><strong>Tier 2</strong> · real work depends on it, nothing leaves the building</td><td>Freshness and volume only</td><td>Business hours, one shared queue, triaged the same morning</td><td>Hours</td></tr>
+        <tr><td><strong>Tier 3</strong> · everything else</td><td>A nightly heartbeat: did it load at all</td><td>No rota and no page. Reviewed quarterly</td><td>Days, accepted in writing</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip">
+      <p><strong>Read the table by column, not by row.</strong> The signals column is the cheap one to change and the response window is the expensive one. Adding distribution monitoring to a tier 2 table costs a query. Promoting a tier 2 table to a named out-of-hours rota costs a person's evening, repeatedly, and that is the decision that needs a conversation.</p>
+    </div>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Write the tier 3 promise down on purpose<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Every estate already has a tier 3. The difference between a good practice and a bad one is whether it was chosen or whether it happened. An accidental tier 3 is the set of tables nobody got round to, and it is indefensible in an incident review because the honest answer is "we did not think about it". A deliberate tier 3 is a decision with a name and a date on it, and it survives the review.</p>
+        <p>The wording matters, because the two versions below get different reactions in the same room.</p>
+        <div class="prompt-box bad">
+          <span class="label">✗ The accidental version</span>
+We monitor our critical tables. The rest are covered by the pipeline's own error handling.
+        </div>
+        <div class="prompt-box good">
+          <span class="label">★ The deliberate version</span>
+Tier 3 is 300 tables with a nightly load heartbeat and no other checks.
+If a tier 3 table is wrong rather than missing, we expect to find out in
+days, usually from the person using it. Owner: analytics. Accepted by the
+data leadership group on 2026-04-14. Reviewed every quarter.
+        </div>
+        <p>The second version buys you three things. It tells stakeholders what to expect so they stop assuming a level of protection that does not exist. It makes promotion a normal request rather than an escalation. And when a tier 3 table does cause an incident, the conversation is about whether the tier was right, which is a productive conversation, rather than about who forgot, which is not.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Who approves a tier change<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A tier list with no approval rule inflates. Every incident produces a request to promote the table involved, every request sounds reasonable in isolation, and within two quarters the top tier holds 80 tables and the rota is meaningless. The rule that prevents it is not strictness, it is arithmetic made visible.</p>
+        <ul>
+          <li><strong>Promotion into tier 1 is capped by the rota, not by the merits.</strong> Decide the ceiling first, out loud: this rota can carry twelve tier 1 tables. After that, a promotion requires a demotion, and the person requesting it gets to argue about which table leaves. That conversation is where the real priorities surface.</li>
+          <li><strong>One named approver, not a committee.</strong> Whoever owns the rota approves tier changes, because they are the person who absorbs the cost. A committee approves everything.</li>
+          <li><strong>Requests are logged with the reason.</strong> Six months of promotion requests is the best evidence you will ever have for a headcount case, because it is a list of things the business said mattered, in its own words, with dates.</li>
+          <li><strong>Demotion is a normal event and needs its own habit.</strong> Nobody ever asks to be demoted, so it has to be scheduled: at each quarterly review, look for tier 1 tables that have not fired a real alert in two quarters and no longer feed anything important. Moving one down is not an admission of error.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The reverse-ETL and export problem<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>This is the finding that reorders most tier lists, and it is why reader count is a proxy and not an answer. A table can look like the quietest thing in the warehouse - two readers, no dashboards, nobody has queried it interactively in months - and feed a job that pushes values into a CRM, a partner SFTP drop, a pricing file or a customer-facing portal. Downstream of that job is an external party, which means question two of the four is a yes, which means the table belongs a tier up.</p>
+        <p>These paths are hard to see for a structural reason. Reader counts are usually computed inside the warehouse, and a reverse-ETL job or a scheduled export is the point at which data leaves the warehouse. The graph you are looking at stops exactly where the risk starts.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's delivery slot table had two readers and sat in tier 3. It also fed a nightly export that populated available slots in the customer app. When a schema change dropped a region column, the app showed no Saturday slots in one city for a day and a half. Nobody in the data team had a monitor on it, and the incident arrived as a support ticket queue rather than as an alert.</p>
+        </div>
+      </div>
+    </details>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A quiet-looking table with two downstream readers feeds an undocumented reverse-ETL job, which feeds a nightly export, which is what the customer sees in the app. Below, reader count says tier 3 by traffic while customer visibility says tier 1 by damage.">
+        <style>
+          .a5bT { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .a5bTi { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .a5bB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a5bI { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .a5bW { font: 400 11px Inter, sans-serif; fill: #BAE6FD; }
+          .a5bH { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .a5bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .a5bR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+        </style>
+        <defs>
+          <marker id="a5bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="a5bH" x="14" y="26">Where the warehouse graph stops</text>
+        <text class="a5bB" x="14" y="44">and the customer starts</text>
+
+        <rect x="14" y="70" width="172" height="82" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a5bTi" x="100" y="100" text-anchor="middle">delivery_slots</text>
+        <text class="a5bB" x="100" y="120" text-anchor="middle">2 readers</text>
+        <text class="a5bB" x="100" y="138" text-anchor="middle">looks like tier 3</text>
+
+        <rect x="240" y="70" width="172" height="82" rx="10" fill="#38BDF8"></rect>
+        <text class="a5bTi" x="326" y="100" text-anchor="middle">reverse-ETL job</text>
+        <text class="a5bI" x="326" y="120" text-anchor="middle">nobody documented</text>
+        <text class="a5bI" x="326" y="138" text-anchor="middle">it, so no lineage</text>
+
+        <rect x="466" y="70" width="172" height="82" rx="10" fill="#0369A1"></rect>
+        <text class="a5bT" x="552" y="100" text-anchor="middle">nightly export</text>
+        <text class="a5bW" x="552" y="120" text-anchor="middle">outside the</text>
+        <text class="a5bW" x="552" y="138" text-anchor="middle">warehouse graph</text>
+
+        <rect x="692" y="70" width="172" height="82" rx="10" fill="#075985"></rect>
+        <text class="a5bT" x="778" y="100" text-anchor="middle">the customer app</text>
+        <text class="a5bW" x="778" y="120" text-anchor="middle">an external party</text>
+        <text class="a5bW" x="778" y="138" text-anchor="middle">sees every value</text>
+
+        <line x1="190" y1="111" x2="234" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a5bAr)"></line>
+        <line x1="416" y1="111" x2="460" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a5bAr)"></line>
+        <line x1="642" y1="111" x2="686" y2="111" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a5bAr)"></line>
+
+        <line x1="424" y1="176" x2="424" y2="200" stroke="#C3D4E0" stroke-width="1.5" stroke-dasharray="4 3"></line>
+
+        <rect x="14" y="208" width="330" height="52" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a5bH" x="30" y="230">Reader count says: tier 3</text>
+        <text class="a5bB" x="30" y="250">two readers, no dashboards, nobody asks</text>
+
+        <line x1="348" y1="234" x2="396" y2="234" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a5bAr)"></line>
+
+        <rect x="402" y="208" width="330" height="52" rx="9" fill="#075985"></rect>
+        <text class="a5bT" x="418" y="230">Damage says: tier 1</text>
+        <text class="a5bW" x="418" y="250">a customer reads it before you do</text>
+
+        <rect x="14" y="288" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a5bN" x="38" y="300">Ask every export and sync job which table it reads. That pass moves 2 or 3 tables up.</text>
+        <text class="a5bR" x="596" y="300">Low traffic is not low damage.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the risk begins where the lineage graph ends.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Cheap coverage for the long tail<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Tier 3 is not zero, and the difference between zero and nearly-zero is worth understanding before you sign the promise. A nightly heartbeat asks one question of every table in the estate: did anything load. It is one aggregate query per table, it costs almost nothing, and it catches the loudest failure class - a table that has silently stopped updating - across 300 tables for less attention than a single well-tuned tier 1 monitor.</p>
+        <ul>
+          <li><strong>It reports, it does not page.</strong> The output is a daily list of tables that did not load, read by whoever is on triage with a coffee. No out-of-hours anything. A list is not an alert and does not spend the false-page budget.</li>
+          <li><strong>It is how tables get discovered, not just checked.</strong> The first run of a heartbeat across a whole estate typically finds tables that stopped loading months ago and nobody noticed. Those are candidates for deletion, which is a better outcome than monitoring them.</li>
+          <li><strong>It gives you the promotion signal.</strong> If a tier 3 table shows up on the daily list and somebody in the business complains the same day, that table has told you it is not tier 3. Two occurrences is enough evidence to promote it.</li>
+        </ul>
+        <p>What tier 3 explicitly does not catch is a table that loads on time with wrong data in it. That is the sentence to say out loud when you present the tier list, because it is the assumption stakeholders make by default.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Tier your estate</h2>
+      <span class="tag demo">★ 18 min · everyone builds</span>
+    </div>
+    <p class="lede">A spreadsheet with five columns is enough. Bring a list of your tables if you have one; if you do not, that is the first step and it takes one query. The output by the end of this is a first-pass tier list, a count of tier 1 tables, and an honest answer about whether your rota can carry that count.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>List your tables, sorted by downstream reader count.</strong> Descending. Your transform project's dependency graph knows this, and so does your warehouse's query history if you do not have a graph. Do not clean the list up yet: the abandoned tables at the bottom are useful information and you will want them for the deletion conversation later.</p>
+      </div>
+      <div class="step">
+        <p><strong>Mark the ones a payment, a regulator or a customer sees.</strong> Go down the list and put a flag against every table where money moves, a filing depends on it, or an external party reads a value that came from it. This is the column that ignores the sort order, and it should. Expect it to flag things near the bottom of the list.</p>
+      </div>
+      <div class="step">
+        <p><strong>Ask which tables would be noticed within an hour if they were wrong.</strong> Not "should be" - would be, by a real person with a real habit. Tables with an audience of daily dashboard users already have human detection and can often sit a tier lower than their reader count suggests. Tables feeding monthly or quarterly processes have nobody, and that is where undetected defects live for weeks.</p>
+      </div>
+      <div class="step">
+        <p><strong>Chase every export and sync job back to its source table.</strong> The reverse-ETL pass. List every scheduled export, every CRM sync, every partner file drop and every application read, then write down which table each one reads. Promote what you find. On a first pass this usually moves two or three tables up a tier, and they are almost never the tables anybody expected.</p>
+      </div>
+      <div class="step">
+        <p><strong>Assign tiers.</strong> Tier 1 for damage plus nobody-would-notice. Tier 2 for real internal dependency. Tier 3 for the rest, including the ones you suspect should be deleted. Write one sentence of reason next to every tier 1 table, because that sentence is what you will be asked for in three months when somebody wants to add a fourth.</p>
+      </div>
+      <div class="step">
+        <p><strong>Count your tier 1 tables and check the rota against the count.</strong> The arithmetic to do in the room: how many people are on the rota, how many tables each can plausibly hold in their head, and what happens on the week when one of them is on leave. If the count exceeds the capacity, you do not have a tier 1 list, you have a wish. Cut it until it fits, and keep the cut list as the first page of your headcount case.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The number to walk out of the room with.</strong> Not the coverage percentage. The count of tier 1 tables next to the count of people who have agreed to answer a page about them. When those two numbers are visible on the same line, the conversation about what to monitor stops being about tooling and becomes a conversation about capacity, which is the conversation you actually need to have with whoever funds this.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 6</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Finish the reverse-ETL pass properly. Ask the application and integration teams what they read, rather than inferring it from the warehouse. The answer will contain at least one path you did not know about, and finding it is worth more than any threshold you will tune this quarter.</li>
+      <li>Write the tier 3 promise in one paragraph and take it to whoever owns the risk. Their reaction tells you whether the tier list is real. If they will not accept it in writing, the tables in question are not tier 3 and your plan needs to change.</li>
+      <li>Set the tier 1 ceiling out loud and write it next to the rota names. A number with names beside it is a commitment; a number on its own is a target nobody owns.</li>
+      <li>Pick the three tier 3 tables you would delete. Deletion is the only intervention that removes risk permanently, and it is almost always available in an estate that has been running for a few years.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Why is monitoring every table at the same service level worse than monitoring a chosen subset, even when the query cost is affordable?</p>
+      <button class="qopt" type="button">A · Because warehouse credits are always the binding constraint on a monitoring programme</button>
+      <button class="qopt" type="button">B · Because most tables have no timestamp column, so the checks would not run anyway</button>
+      <button class="qopt" type="button">C · Because a team's tolerance for false alarms is a fixed shared resource, and spending it on tables nobody reads leaves none for the tables that matter</button>
+      <p class="qwhy">Money scales and attention does not. False-page tolerance is one pool shared across the whole estate, so a noisy monitor on a staging table degrades detection on the payments table.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">A table has two downstream readers, no dashboards, and feeds a nightly export into the customer app. What does the reader count tell you?</p>
+      <button class="qopt" type="button">A · That it belongs in tier 3, since reader count is the best available proxy for blast radius</button>
+      <button class="qopt" type="button">B · Almost nothing, because the reader count is computed inside the warehouse and the export is the point where data leaves it</button>
+      <button class="qopt" type="button">C · That the export should be rebuilt as a warehouse view so the lineage graph can see it</button>
+      <p class="qwhy">A high reader count means a wide blast radius. A low one means the graph you are looking at cannot see the path that matters. Chasing every export back to its source table is what finds these, and it moves two or three tables up on a typical first pass.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">What is the difference between an accidental tier 3 and a deliberate one?</p>
+      <button class="qopt" type="button">A · The deliberate one has a written detection target, a named owner and a date, so an incident becomes a question about whether the tier was right</button>
+      <button class="qopt" type="button">B · The deliberate one has more signals enabled, usually freshness plus volume rather than a heartbeat</button>
+      <button class="qopt" type="button">C · There is no practical difference, since neither one is paged on</button>
+      <p class="qwhy">Both may run the same single heartbeat. What differs is defensibility: a written promise of days-to-detect, accepted by a named owner, turns an incident review into a tiering decision rather than a search for who forgot.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Table tiering as a service-level decision</span>
+        <span class="note">Four damage criteria, three written tiers, the approval rule and the rota ceiling that caps the top tier.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The steep distribution of damage across an estate</span>
+        <span class="note">Stated as a shape rather than a percentage, with the morning of work that finds yours: reader counts, two conversations, incident history.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Cheap coverage for the long tail</span>
+        <span class="note">The nightly heartbeat: one aggregate per table, a daily list rather than a page, and what it explicitly does not catch.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Lineage, blast radius and undocumented reverse-ETL paths</span>
+        <span class="note">Used tonight as a tiering input. The graph itself, including column-level lineage and the impact query, is built in builder session 7.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Alert fatigue and the price of a false page</span>
+        <span class="note">The constraint behind every tier decision here. Priced in leader session 4 and measured against 30 nights of history in builder session 8.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Severity weighting across incidents</span>
+        <span class="note">Not covered by design. Tiers weight tables, not individual incidents, and a real estate would eventually want both.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 5 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>The real constraint</b><span>Not query cost. The number of tables about which somebody can be woken and still be useful.</span></div>
+      <div class="cheat-item"><b>Four damage questions</b><span>Decision or payment, external eyes, downstream readers, how fast anybody would notice unaided.</span></div>
+      <div class="cheat-item"><b>Two are detection</b><span>A table with daily dashboard users already has a human monitor. Quarterly extracts have nobody.</span></div>
+      <div class="cheat-item"><b>Tier 1</b><span>All five signals, learned thresholds, a named rota in and out of hours, minutes to detect.</span></div>
+      <div class="cheat-item"><b>Tier 2</b><span>Freshness and volume only, business hours, one shared queue, hours to detect.</span></div>
+      <div class="cheat-item"><b>Tier 3</b><span>A nightly heartbeat and nothing else. Days to detect, accepted in writing by a named owner.</span></div>
+      <div class="cheat-item"><b>The rota ceiling</b><span>Set the tier 1 cap first. After that a promotion needs a demotion, and that argument reveals the priorities.</span></div>
+      <div class="cheat-item"><b>The reverse-ETL pass</b><span>Chase every export back to its source table. Low traffic is not low damage.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Leader session 5 of 6 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="a4-alert-or-noise.html">← Leader session 4 · Alert or noise</a>
+      <a href="a6-trust-score.html">Leader session 6 · From firefighting to a trust score →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

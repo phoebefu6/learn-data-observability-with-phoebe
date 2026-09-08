@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 1 of 6. The three failure shapes that raise no error, data downtime measured as hours-wrong-while-in-use, and the discovery gap: the share of your incidents that a stakeholder reports before your team knows.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="What breaks, and who finds out first - learn data observability with phoebe">
+<meta property="og:description" content="Leader session 1 of 6. A green pipeline is not evidence. Put a number on the hours a table was wrong while people were using it, and on who found out first.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/a1-what-breaks.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What breaks, and who finds out first - learn data observability with phoebe">
+<meta name="twitter:description" content="Late, short, and wrong-but-complete. None of the three fails a pipeline, and finance finds all three on a Monday.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 1 · What breaks, and who finds out first - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Leader session 1 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Leader session 1 of 6</div>
+    <h1>What breaks, and <span class="accent">who finds out first</span></h1>
+    <p class="sub">Every dashboard you have signed off is one wrong table away from being a bad decision, and the uncomfortable part is that the wrong table almost never announces itself. Pipelines finish green. Jobs exit zero. The report renders. Tonight you learn the three shapes a data failure takes when nothing errors, and you leave with your own downtime number: how many hours your tables were wrong while people were using them, and how often somebody outside your team was the one who noticed.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundational</span>
+      <span class="chip audience">Data and analytics leaders</span>
+      <span class="chip audience">Anyone who signs off on a dashboard</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · What a wrong table costs</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: your own downtime audit</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>How the leader track works</h2>
+    </div>
+    <p class="lede">Six sessions, 45 minutes each, no SQL. The artifact you build across them is a <strong>one-page trust report</strong> you could hand to a CFO. Tonight it is the cost: what a wrong table does to a business and who currently discovers it. Session 2 takes the five signals and what each one is blind to. Session 3 picks which quality dimensions are worth measuring at all. Session 4 is the noise problem, which is where most programmes quietly die. Session 5 is tiering, because you will never instrument everything. Session 6 turns the whole thing into the three numbers you actually report. The running example throughout is <strong>orders_daily</strong> at <strong>Bellwether</strong>, a grocery delivery company with five real defects sitting in its warehouse that nobody has noticed yet.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A list of your last six months of data incidents with two columns filled in: hours wrong, and who found it. The share of that list found by a stakeholder rather than by your team, which is the single number that changes how a leadership meeting goes. And one euro figure on your worst incident, because a business case built on hours is an argument and a business case built on money is a decision.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why the cost comes before the tooling<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The usual order is backwards. A team gets burned by an incident, evaluates three vendors, buys one, instruments four hundred tables, and six months later cannot answer whether anything improved. The reason is that nobody wrote down the starting position, so there is nothing to compare against.</p>
+        <p>The starting position is two numbers and both are free to collect: how long your tables are wrong before anybody knows, and what share of that discovery comes from outside the data team. Everything after that is a question of how much of the gap you want to buy, and at what price in interruptions.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's finance team found a broken revenue number on a Monday morning. The pipeline had not failed, so nothing alerted. One of three regional shards had stopped arriving on the Thursday before, and the table had been at 41 percent of a normal day's rows for two business days. Three decisions were made on that number before anybody knew, including a replenishment order for the wrong region.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The vocabulary the rest of the track uses<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>Data downtime</strong> - the hours in which a table was late, short or wrong <em>while people were relying on it</em>. Not the hours it was broken in the abstract, which is why a defect that lands on a Saturday and is fixed on Sunday costs almost nothing.</li>
+          <li><strong>Time to detect</strong> - from the moment the table went wrong to the moment a human knew. The part of downtime you can shorten with money and effort.</li>
+          <li><strong>Time to resolve</strong> - from knowing to fixed. Mostly a function of your team's capacity and the state of the upstream system, and much harder to buy.</li>
+          <li><strong>Discovery gap</strong> - the share of incidents reported to you rather than by you. A programme is working when this falls, regardless of what the coverage dashboard says.</li>
+          <li><strong>Blast radius</strong> - everything downstream of a broken table: models, dashboards, exports, and the one job that pushes into the CRM that nobody has documented.</li>
+          <li><strong>False page</strong> - an alert on a night when nothing was actually wrong. The currency you spend to buy detection, and the subject of session 4.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the three failure shapes and why success is a weak signal</span>
+      <h2>A green pipeline is not evidence</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">There is a comfortable belief that if the jobs ran, the data is fine. It survives because most of the time it is true, and it fails on exactly the incidents that cost the most. Three failure shapes account for almost all of them, and none of the three raises an error anywhere in your stack.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three failure shapes side by side. Late: rows arrive hours after the promise, seen by freshness. Short: one of three shards never arrived, seen by volume. Wrong but complete: on time and correctly sized but with duplicated keys and nulls, seen by uniqueness and null rate. All three finish green in the orchestrator.">
+        <style>
+          .a1aHd { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a1aT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .a1aB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .a1aP { font: 700 11px Inter, sans-serif; fill: #fff; }
+          .a1aR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .a1aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="a1aHd" x="14" y="24">Three shapes of failure, and not one of them fails a pipeline</text>
+
+        <rect x="14" y="44" width="268" height="42" rx="10" fill="#075985"></rect>
+        <text class="a1aT" x="30" y="71">1 · Late</text>
+        <rect x="14" y="86" width="268" height="130" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a1aB" x="30" y="112">The rows land, hours after the</text>
+        <text class="a1aB" x="30" y="130">06:00 promise. Nothing missing,</text>
+        <text class="a1aB" x="30" y="148">nothing wrong, just too late.</text>
+        <rect x="30" y="162" width="184" height="26" rx="7" fill="#0369A1"></rect>
+        <text class="a1aP" x="42" y="179">Seen by: freshness</text>
+        <text class="a1aR" x="30" y="206">No error raised. Job exited 0.</text>
+
+        <rect x="306" y="44" width="268" height="42" rx="10" fill="#0369A1"></rect>
+        <text class="a1aT" x="322" y="71">2 · Short</text>
+        <rect x="306" y="86" width="268" height="130" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a1aB" x="322" y="112">The load ran. One of three</text>
+        <text class="a1aB" x="322" y="130">regional shards never arrived,</text>
+        <text class="a1aB" x="322" y="148">so it holds 41 percent of normal.</text>
+        <rect x="322" y="162" width="184" height="26" rx="7" fill="#0369A1"></rect>
+        <text class="a1aP" x="334" y="179">Seen by: volume</text>
+        <text class="a1aR" x="322" y="206">No error raised. Query worked.</text>
+
+        <rect x="598" y="44" width="268" height="42" rx="10" fill="#38BDF8"></rect>
+        <text class="a1aHd" x="614" y="71">3 · Wrong but complete</text>
+        <rect x="598" y="86" width="268" height="130" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a1aB" x="614" y="112">On time, right row count,</text>
+        <text class="a1aB" x="614" y="130">wrong values. A merge key</text>
+        <text class="a1aB" x="614" y="148">changed and nobody said so.</text>
+        <rect x="614" y="162" width="212" height="26" rx="7" fill="#0369A1"></rect>
+        <text class="a1aP" x="626" y="179">Seen by: keys and nulls</text>
+        <text class="a1aR" x="614" y="206">No error raised. All green.</text>
+
+        <rect x="14" y="248" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a1aN" x="38" y="260">Success means the code ran. It has never meant the data is right.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - late, short, and wrong-but-complete, with the signal that sees each one.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why orchestration success is a weak signal<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>An orchestrator reports on itself. It knows whether the task it launched finished, how long it took, and whether the process returned an error code. It does not know how many rows landed, whether the third shard was in the batch, or whether the customer id column went 90 percent null overnight. It was never designed to know any of that, and asking it to is a category error.</p>
+        <p>So the green tick answers a real question, just a narrower one than people read it as: <em>did the code we wrote run to completion</em>. It says nothing about whether the upstream system it read from behaved. In practice most of your painful incidents come from upstream behaviour, because that is the part you do not control and do not deploy.</p>
+        <div class="callout tip">
+          <p><strong>A useful test for any status board.</strong> Ask what it would show on a night when the source system silently sent two thirds of the usual data. If the answer is a green tick, then the board is reporting on your code and somebody still has to report on your data.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>A pipeline error and a data defect are different animals<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>They arrive differently, they are found differently, and they cost differently. Worth separating out loud, because the two get merged into one line item called "data issues" in most incident reporting, and the merged number cannot be acted on.</p>
+        <table class="clean">
+          <thead>
+            <tr><th></th><th>Pipeline error</th><th>Data defect</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>How you learn</td><td>The tool tells you, usually within minutes</td><td>Somebody tells you, usually on a Monday</td></tr>
+            <tr><td>Typical detection</td><td>Minutes</td><td>Hours to days</td></tr>
+            <tr><td>Who is annoyed</td><td>Your engineers</td><td>Your stakeholders, and their stakeholders</td></tr>
+            <tr><td>What is downstream</td><td>Nothing yet, the build stopped</td><td>Everything, because the build succeeded</td></tr>
+            <tr><td>Reputational cost</td><td>Low. Failure handled</td><td>High. A number was believed and used</td></tr>
+          </tbody>
+        </table>
+        <p>The last row is the one that matters to you. A pipeline that fails loudly is a pipeline doing its job, and stale data is often better than wrong data because at least it looks stale. The expensive failure is the one that delivered a confident, complete, plausible, incorrect answer, and it did so on time.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Who currently finds your incidents<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Ask five people on your team to name the last three data incidents. Then ask who reported each one. The answers cluster into four groups, and the mix tells you almost everything about the maturity of the practice without a single tool being installed.</p>
+        <ul>
+          <li><strong>A monitor found it.</strong> Detection in minutes, no audience involved, the incident stays internal. This is the only group where downtime is cheap.</li>
+          <li><strong>An engineer found it by accident</strong> while working on something else. Detection in hours, usually because the shape of a query looked odd. Real, but you cannot staff a practice on luck.</li>
+          <li><strong>An analyst found it</strong> mid-analysis, which is the most common answer in most organisations. Detection in a day or two, and the cost includes their wasted afternoon.</li>
+          <li><strong>A business stakeholder found it</strong> and told you. Detection in days, plus a trust cost that outlives the fix by months. Every one of these is a bill you already paid.</li>
+        </ul>
+        <p>Count the fourth group as a proportion of the whole. If it is above about a third, the programme you need is not a smarter detector, it is any detector at all on the tables that matter, which is session 5.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers downtime as a unit and the discovery gap</span>
+      <h2>Data downtime, as a number</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">"We have data quality problems" is not fundable. "Our top twelve tables were wrong for 340 hours of business time last quarter, and stakeholders found 6 of the 9 incidents before we did" is fundable, and it is the same information. The unit that carries the argument is <strong>hours wrong while in use</strong>.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 356" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The same broken night in two versions. With a monitor watching, the defect is detected at hour 0.5 and the table is wrong for well under two hours. With nobody watching, the table stays wrong for 26 hours until a stakeholder reports it, and three decisions are taken on the wrong number in between.">
+        <style>
+          .a1bHd { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a1bSub { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a1bL { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .a1bW { font: 700 11px Inter, sans-serif; fill: #fff; }
+          .a1bB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .a1bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a1bO { font: 700 11px Inter, sans-serif; fill: #B45309; }
+          .a1bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="a1bHd" x="14" y="24">The discovery gap, on one broken night</text>
+        <text class="a1bSub" x="14" y="42">same defect, two ways of finding out about it</text>
+
+        <text class="a1bL" x="14" y="76">A monitor is watching</text>
+        <rect x="60" y="86" width="38" height="30" rx="6" fill="#0369A1"></rect>
+        <rect x="106" y="82" width="139" height="38" rx="8" fill="#075985"></rect>
+        <text class="a1bW" x="175" y="98" text-anchor="middle">hour 0.5</text>
+        <text class="a1bW" x="175" y="113" text-anchor="middle">monitor detects</text>
+        <text class="a1bB" x="257" y="105">0.5 h wrong. The dashboard was held and the table backfilled by 07:30.</text>
+        <text class="a1bM" x="60" y="136">table goes wrong at 06:00</text>
+
+        <text class="a1bL" x="14" y="178">Nobody is watching</text>
+        <text class="a1bO" x="60" y="196">decisions taken while wrong:</text>
+        <rect x="255" y="204" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <rect x="407" y="204" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <rect x="560" y="204" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <rect x="60" y="226" width="659" height="30" rx="6" fill="#991B1B"></rect>
+        <rect x="727" y="222" width="139" height="38" rx="8" fill="#075985"></rect>
+        <text class="a1bW" x="796" y="238" text-anchor="middle">hour 26</text>
+        <text class="a1bW" x="796" y="253" text-anchor="middle">finance reports it</text>
+        <line x1="719" y1="226" x2="719" y2="296" stroke="#C3D4E0" stroke-width="1.5" stroke-dasharray="4 4"></line>
+        <text class="a1bB" x="60" y="278">26 h wrong. A replenishment order, a promo call and a board number.</text>
+
+        <line x1="60" y1="296" x2="820" y2="296" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <text class="a1bM" x="60" y="312" text-anchor="middle">0 h</text>
+        <text class="a1bM" x="212" y="312" text-anchor="middle">6 h</text>
+        <text class="a1bM" x="364" y="312" text-anchor="middle">12 h</text>
+        <text class="a1bM" x="516" y="312" text-anchor="middle">18 h</text>
+        <text class="a1bM" x="668" y="312" text-anchor="middle">24 h</text>
+        <text class="a1bM" x="820" y="312" text-anchor="middle">30 h</text>
+
+        <rect x="14" y="326" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a1bN" x="38" y="338">The gap between hour 0.5 and hour 26 is the only part of this you can buy.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - identical defect, and the whole difference is who noticed.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The four inputs to a downtime number<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Four inputs, and you can estimate all four from memory well enough to be useful. Precision is not the goal on the first pass; getting the order of magnitude on the table in front of the person who funds things is.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Input</th><th>What it is</th><th>Can you change it?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Detection time</td><td>Hours from wrong to somebody knowing</td><td>Yes, directly. This is what monitors buy</td></tr>
+            <tr><td>Resolution time</td><td>Hours from knowing to fixed</td><td>Slowly. Capacity, runbooks, upstream owners</td></tr>
+            <tr><td>Blast radius</td><td>How many reports, models and exports read it</td><td>Yes, by simplifying the estate. Not quickly</td></tr>
+            <tr><td>Decisions taken while wrong</td><td>What was actually acted on before the fix</td><td>Only by shortening detection</td></tr>
+          </tbody>
+        </table>
+        <p>Multiply the first two by the third and you get exposure in report-hours, which is a reasonable proxy for how much wrongness was available to be believed. The fourth input is the one that turns exposure into money, and it is the only one a business stakeholder can help you fill in.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether costed the finance incident at about 38,000 euro: 24,000 in a replenishment order sized against the short table, 9,000 in a promotional spend decision that would have gone the other way, and 5,000 in analyst and engineer time spent reconciling. The number that got the programme funded was the 24,000, because it was a real invoice with a real signature on it.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The discovery gap, and why it changes behaviour<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Of all the numbers available to you, one moves the room: <strong>the percentage of incidents that a stakeholder reported to you rather than your team reporting to them</strong>. It works for three reasons and they are worth knowing before you present it.</p>
+        <ul>
+          <li><strong>Everybody can check it.</strong> The people in the meeting were the ones who reported those incidents. There is no methodology to argue about, which is not true of a coverage percentage.</li>
+          <li><strong>It cannot be gamed by adding monitors.</strong> Coverage goes up when you instrument more tables, whether or not anything improves. The discovery gap only falls when detection genuinely beats the audience.</li>
+          <li><strong>It is about trust, not about tables.</strong> The cost of a stakeholder finding your defect is not the defect, it is that the next correct number also gets questioned. That cost is invisible in every technical metric you have.</li>
+        </ul>
+        <p>Set it as the headline goal and the follow-on decisions get easier. Which tables to instrument first becomes "the ones stakeholders keep finding problems in". Whether a monitor is worth keeping becomes "did it ever beat a human to something real". Session 6 makes this one of the three numbers you report on a page.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Time to detect is the part you can fund<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Split any incident into detect, then resolve. Both are hours and they feel equivalent on a slide, but they behave completely differently when you try to spend money on them.</p>
+        <p><strong>Resolution</strong> depends on the upstream system, whoever owns it, whether they are in your organisation, whether a backfill is even possible, and how many people you have. Halving it is a reorganisation. It is real work and it is not a project you can start this quarter with a modest budget.</p>
+        <p><strong>Detection</strong> depends on whether anything is watching. Going from nothing to a scheduled check on your twelve most-read tables is days of work and no new licences, and it typically takes detection from days to under an hour on the failure shapes those checks can see. There is no other lever in the practice with that ratio.</p>
+        <p>Which is why the honest version of the first business case is narrow: no promise about fewer incidents, no promise about faster fixes, one promise about hours of exposure. Overpromising here is the most common way a programme loses its sponsor in month four, and session 6 has the list of things not to promise.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Your own downtime audit</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">No tooling, no access, no data pull. Six months of incidents that people already remember, five columns, twenty minutes. This is the artifact you extend in every later session, and it is deliberately built from memory because memory is what your stakeholders are working from too.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>List the last six months of incidents anybody remembers.</strong> Ask the room, not the ticket system. If it never became a ticket but three people still bring it up, it counts, and if it was ticketed and nobody remembers it, it probably did not cost much. Expect somewhere between five and fifteen. Fewer than five usually means the incidents are being absorbed silently rather than not happening.</p>
+      </div>
+      <div class="step">
+        <p><strong>For each one, write who found it and how many hours it was wrong.</strong> Hours of business time, not wall clock: a table that broke on Friday evening and was fixed on Saturday was wrong for very few usable hours. Round to whole hours and argue about it out loud, because the argument is where the useful detail comes out.</p>
+        <div class="prompt-box good">
+          <span class="label">★ The incident log, five columns and nothing more</span>
+Table  |  What went wrong  |  Found by  |  Hours wrong (business)  |  What was decided on it
+
+orders_daily  |  one of three shards gone, 41 pct of normal  |  finance  |  26  |  replenishment order
+customer_dim  |  duplicate keys after a source migration  |  analyst  |  9   |  nothing, caught mid-analysis
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>Count the share found by a stakeholder rather than by your team.</strong> One division. Write the fraction, not just the percentage, because 4 of 9 lands differently than 44 percent in a room of people who remember all nine. This is your discovery gap and it is the baseline you will be measured against, so record the date you took it.</p>
+      </div>
+      <div class="step">
+        <p><strong>Put one euro or dollar figure on the worst one.</strong> Pick the single worst incident and cost only what you can defend: an order placed at the wrong size, a spend decision that would have gone differently, hours of analyst time redone. Skip anything speculative. One defensible number beats a spreadsheet of estimates, and it is the sentence that gets repeated when you are not in the room.</p>
+      </div>
+      <div class="step">
+        <p><strong>Name the tables involved and count them.</strong> Nearly every group is startled here. Ten incidents typically involve four or five distinct tables, often the same two repeatedly, and those are almost always the tables the business actually reads. You have just done the first draft of the tiering exercise from session 5 without meaning to, and you did it from evidence rather than from an inventory.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>How you say it decides whether it is heard.</strong> The audit is not the deliverable. One sentence with a number, a source and a consequence is the deliverable, and it is worth writing before you leave the room.</p>
+    </div>
+
+    <div class="prompt-box bad">
+      <span class="label">✗ The version that starts a discussion about data quality</span>
+We have some data quality issues in the warehouse and would like to invest in
+observability tooling to improve trust in our reporting.
+    </div>
+
+    <div class="prompt-box good">
+      <span class="label">★ The version that starts a discussion about a budget</span>
+Over six months, 9 incidents. Finance and commercial found 6 of the 9 before we did.
+Total exposure 340 business hours across 5 tables. The worst one cost 24,000 euro in a
+replenishment order sized against a table holding 41 percent of its rows for two days.
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 2</h2>
+      <span class="tag exercise">25 min</span>
+    </div>
+    <ol>
+      <li>Finish the incident log properly. Send it to two people who were involved in the incidents and ask them to correct the hours. They will, and the corrections are usually upward.</li>
+      <li>Ask one business stakeholder a single question: "when did you last not trust a number in a report, and what did you do about it?" Write the answer down verbatim. It is more persuasive than anything you will produce yourself.</li>
+      <li>Take the tables from your log and rank them by how many incidents each one appears in. Bring the top five to session 2.</li>
+      <li>For your worst incident, write down which of the three failure shapes it was: late, short, or wrong-but-complete. If you cannot tell, that itself is worth bringing, because it usually means nobody recorded what the table looked like at the time.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">One of three regional shards stops arriving. The load job reads what is there, finishes, and exits cleanly. What does your orchestrator report?</p>
+      <button class="qopt" type="button">A · A warning, because the row count dropped sharply against yesterday</button>
+      <button class="qopt" type="button">B · A failure, because a required input was missing</button>
+      <button class="qopt" type="button">C · Success, because the code it launched ran to completion</button>
+      <p class="qwhy">An orchestrator reports on its own tasks: did the process finish, how long did it take, what exit code. Row counts and missing shards are properties of the data, and nothing in that stack was asked to look at them.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Which failure shape is the most expensive, and why?</p>
+      <button class="qopt" type="button">A · Late, because stakeholders notice a missing dashboard immediately</button>
+      <button class="qopt" type="button">B · Wrong but complete, because it delivers a plausible answer on time and gets believed and acted on</button>
+      <button class="qopt" type="button">C · Short, because the missing rows are the ones that mattered most</button>
+      <p class="qwhy">Stale data usually looks stale, and a missing table announces itself. A table that is punctual, correctly sized and quietly incorrect is the one that ends up in a decision, which is where the cost lives.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">You need one number for the leadership meeting. Why is the discovery gap a better choice than a coverage percentage?</p>
+      <button class="qopt" type="button">A · Coverage rises just by instrumenting more tables, while the discovery gap only falls when detection actually beats the audience</button>
+      <button class="qopt" type="button">B · Coverage is harder to calculate accurately from warehouse metadata</button>
+      <button class="qopt" type="button">C · The discovery gap includes resolution time, so it captures the whole incident</button>
+      <p class="qwhy">Coverage measures your effort. The discovery gap measures the outcome, everybody in the room can verify it from memory, and it cannot be improved by adding monitors that never catch anything.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Data downtime as hours-wrong-while-in-use</span>
+        <span class="note">Defined, decomposed into its four inputs, and costed on a real incident with a defensible euro figure.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The discovery gap: team-first versus stakeholder-first detection</span>
+        <span class="note">Taught as the headline number, with the three reasons it survives scrutiny where a coverage percentage does not.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Why pipeline success is not evidence of correct data</span>
+        <span class="note">The three failure shapes that raise no error, and the difference between a pipeline error and a data defect.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">The five signals of data observability</span>
+        <span class="note">Named tonight alongside the failure each one catches. Session 2 takes all five properly, including what each is blind to.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Table tiering and coverage without headcount</span>
+        <span class="note">Tonight's audit produces the first evidence-based table list. Session 5 turns it into tiers and a cheap long-tail policy.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Vendor product comparison</span>
+        <span class="note">Not covered by design. The category and the questions worth asking appear in session 6; scorecards between named products do not.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 1 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Three failure shapes</b><span>Late, short, and wrong-but-complete. None of the three raises an error anywhere in the stack.</span></div>
+      <div class="cheat-item"><b>Green means the code ran</b><span>An orchestrator reports on its own tasks. It was never asked to look at the data.</span></div>
+      <div class="cheat-item"><b>The expensive one</b><span>Punctual, correctly sized, quietly wrong. It gets believed, and then it gets acted on.</span></div>
+      <div class="cheat-item"><b>The unit</b><span>Hours wrong while in use. Business hours, not wall clock. A Saturday defect costs little.</span></div>
+      <div class="cheat-item"><b>Four inputs</b><span>Detection, resolution, blast radius, decisions taken while wrong. Only the first is cheap to move.</span></div>
+      <div class="cheat-item"><b>The discovery gap</b><span>Share of incidents a stakeholder reported to you. Falls only when detection beats the audience.</span></div>
+      <div class="cheat-item"><b>Fund detection</b><span>Days of work, no licences, days to under an hour. No other lever has that ratio.</span></div>
+      <div class="cheat-item"><b>One defensible euro</b><span>A real invoice with a signature on it beats a spreadsheet of estimates in every meeting.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Leader session 1 of 6 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="../index.html">← All sessions</a>
+      <a href="a2-five-signals.html">Leader session 2 · Five signals →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

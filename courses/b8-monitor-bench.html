@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 8 of 8. Thirty nights of load metadata, five real defects, seven monitors, and three numbers that decide whether the set is worth having. Tightening every threshold catches 5 of 5 and detects nothing.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="The monitor bench - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 8 of 8. Run your monitor set against 30 nights of history and count what it caught, what it cost, and how long it took.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b8-monitor-bench.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The monitor bench - learn data observability with phoebe">
+<meta name="twitter:description" content="Five of five caught, 25 false pages, and detection back where it started. The bench does the arithmetic.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 8 · The monitor bench - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 8 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 8 of 8</div>
+    <h1>The monitor <span class="accent">bench</span></h1>
+    <p class="sub">Seven sessions of signals, and now the only question that matters: does the set work? The bench below holds 30 nights of Bellwether's load metadata with five real defects buried in it. Switch monitors on and it evaluates every threshold night by night, in your browser, and reports three numbers rather than one. Two of them get worse when you do the thing everybody does after an incident.</p>
+    <div class="chip-row">
+      <span class="chip level">🔴 Hardest</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip audience">Whoever carries the pager</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:3">3-15 · Three numbers, not one</span>
+      <span class="a3" style="flex:6">15-40 · Build-along: run the ladder</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>What the bench measures</h2>
+    </div>
+    <p class="lede">Coverage is the number everybody reports and the least useful of the three. A set that catches every incident while paging somebody four times a week has not bought detection, it has bought a muted channel. So the bench prints <strong>caught before the stakeholder</strong>, <strong>false pages</strong> and <strong>mean hours to detect</strong> side by side, and the ladder below is worth walking in order because the interesting rungs are the ones where two numbers move in opposite directions.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A monitor set you have actually scored rather than assumed. The measured difference between a naive threshold and a learned one, which turns out to be eight false pages for the same two catches. And the number that ends the argument about tightening thresholds after an incident: seven monitors at hair-trigger settings catch 2 of 5 and detect no faster than having almost nothing on.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why three numbers and not a score<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Any single score hides the trade. Coverage alone rewards firing on everything. Precision alone rewards firing on nothing. A weighted blend of the two rewards whoever picked the weights, which is usually the person presenting the slide.</p>
+        <p>Three numbers force the conversation to be about the exchange rate: what did this monitor cost in pages, and what did it buy in hours. That is a decision a team can actually make, and it is the same shape as an error budget in service reliability, which is where the idea comes from.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether ran a review after the finance incident and added six monitors in an afternoon, all at aggressive thresholds. Detection for the next real problem took 26 hours, exactly as long as before, because the on-call had stopped opening the channel by day nine. The bench reproduces this: it is the last row of the table below.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>What is real here and what is modelled<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Worth being precise about, because a widget that quietly scripts its own conclusion teaches nothing.</p>
+        <ul>
+          <li><strong>Real.</strong> The 30 nights of metadata, generated once from a fixed seed and identical for every learner. The five defects, injected into specific nights. Every monitor's arithmetic: trailing percentiles, same-weekday medians, duplicate rates, column-set diffs, standard deviations. The counts, the false pages and the detection times all fall out of that arithmetic.</li>
+          <li><strong>Modelled.</strong> The human. Six or more false pages in a trailing week is treated as a muted channel: the page still fires, nobody reads it, and the 09:00 stakeholder gets there first. That threshold is a teaching choice, not a measurement, and the widget says so on its face.</li>
+          <li><strong>Deliberately absent.</strong> Any notion of severity weighting. All five defects count the same here, which is not true in a real estate and is the first thing you would add.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the ladder and where the numbers diverge</span>
+      <h2>The ladder, with the numbers it actually produces</h2>
+      <span class="tag concept">10 min live</span>
+    </div>
+    <p class="lede">Every row below is computed by the bench on this page, not asserted. Walk it in order and watch rungs three and four, where the interesting thing happens: swapping two naive monitors for two learned ones keeps the catches and removes every false page.</p>
+
+    <table class="clean">
+      <thead>
+        <tr><th>Monitors on</th><th>Caught</th><th>False pages</th><th>Mean hours to detect</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nothing</td><td>0 of 5</td><td>0</td><td>26.0</td></tr>
+        <tr><td>Freshness, fixed deadline</td><td>1 of 5</td><td>0</td><td>20.9</td></tr>
+        <tr><td>+ volume, fixed band</td><td>2 of 5</td><td>8</td><td>15.8</td></tr>
+        <tr><td>Learned freshness + same-weekday volume</td><td>2 of 5</td><td>0</td><td>15.8</td></tr>
+        <tr><td>+ uniqueness</td><td>3 of 5</td><td>0</td><td>10.7</td></tr>
+        <tr><td>+ schema diff</td><td>4 of 5</td><td>1</td><td>5.6</td></tr>
+        <tr><td>+ null rate, all five signals</td><td>5 of 5</td><td>2</td><td>0.5</td></tr>
+        <tr><td>All seven monitors, every threshold tightened</td><td>2 of 5</td><td>25</td><td>15.8</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip">
+      <p><strong>Rungs three and four are the whole course in two rows.</strong> Same two catches, same detection time, eight false pages against zero. The difference is not effort or tooling, it is that one pair of thresholds was set from a guess and the other from the table's own history.</p>
+    </div>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="An ascending ladder of monitor sets plotted against catches, with a final rung that falls back down. Catches rise from zero to five as learned monitors are added, then collapse to two when every threshold is tightened and the alert channel is muted.">
+        <style>
+          .b8aH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b8aB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b8aW { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b8aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .b8aR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+        </style>
+
+        <line x1="60" y1="250" x2="820" y2="250" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <text class="b8aB" x="60" y="268">nothing on</text>
+        <text class="b8aB" x="300" y="268">naive thresholds</text>
+        <text class="b8aB" x="500" y="268">learned thresholds</text>
+        <text class="b8aB" x="700" y="268">all seven, tightened</text>
+
+        <rect x="60" y="234" width="90" height="16" rx="4" fill="#BAE6FD"></rect>
+        <text class="b8aH" x="105" y="228" text-anchor="middle">0 of 5</text>
+
+        <rect x="170" y="200" width="90" height="50" rx="4" fill="#38BDF8"></rect>
+        <text class="b8aH" x="215" y="194" text-anchor="middle">1 of 5</text>
+
+        <rect x="280" y="166" width="90" height="84" rx="4" fill="#38BDF8"></rect>
+        <text class="b8aH" x="325" y="160" text-anchor="middle">2 of 5</text>
+        <text class="b8aR" x="325" y="144" text-anchor="middle">8 false</text>
+
+        <rect x="390" y="166" width="90" height="84" rx="4" fill="#0369A1"></rect>
+        <text class="b8aW" x="435" y="212" text-anchor="middle">2 of 5</text>
+        <text class="b8aH" x="435" y="160" text-anchor="middle">0 false</text>
+
+        <rect x="500" y="98" width="90" height="152" rx="4" fill="#0369A1"></rect>
+        <text class="b8aW" x="545" y="144" text-anchor="middle">4 of 5</text>
+        <text class="b8aH" x="545" y="92" text-anchor="middle">1 false</text>
+
+        <rect x="610" y="64" width="90" height="186" rx="4" fill="#075985"></rect>
+        <text class="b8aW" x="655" y="110" text-anchor="middle">5 of 5</text>
+        <text class="b8aH" x="655" y="58" text-anchor="middle">2 false · 0.5h</text>
+
+        <rect x="720" y="166" width="90" height="84" rx="4" fill="#991B1B"></rect>
+        <text class="b8aW" x="765" y="212" text-anchor="middle">2 of 5</text>
+        <text class="b8aR" x="765" y="160" text-anchor="middle">25 false</text>
+
+        <rect x="60" y="26" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b8aN" x="84" y="38">Tightening everything is the only step on this chart that goes backwards.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the last rung is the one everybody builds after an incident.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Run the ladder yourself</h2>
+      <span class="tag demo">★ 25 min · everyone builds</span>
+    </div>
+    <p class="lede">The bench is live below. Every number updates as you toggle, and hovering a night says what fired and why. Work the steps in order; the last two are the ones worth arguing about.</p>
+
+    <div data-obs-bench></div>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Start from nothing.</strong> Read the strip: 30 quiet-looking nights, five of them red. Note that no monitor is watching any of them and the mean detection time is 26 hours, which is the time until somebody in finance opens a dashboard the next morning.</p>
+      </div>
+      <div class="step">
+        <p><strong>Press "the naive pair".</strong> Fixed deadline plus fixed volume band. Two catches and eight false pages, all eight on weekends. Hover one to confirm: the count is fine, the band is wrong.</p>
+      </div>
+      <div class="step">
+        <p><strong>Press "the learned pair".</strong> Same two catches. Zero false pages. This is the single highest-value swap in the whole track and it involves no new tooling, only comparing against the right history.</p>
+      </div>
+      <div class="step">
+        <p><strong>Add uniqueness, then schema, then null rate.</strong> Watch which night lights up at each step, and notice that night 19 is invisible to everything except the duplicate rate. Row count on night 19 is normal. A pipeline-success check, a freshness check and a volume check all pass on a night when every downstream sum is wrong.</p>
+      </div>
+      <div class="step">
+        <p><strong>Look at the two false pages you are left with.</strong> Night 8 is a null-rate wobble inside a genuinely tiny standard deviation. Night 24 is the schema monitor firing on the <em>revert</em>, which is a real change and arguably a real page. Decide which of the two you would tune away and what that costs you.</p>
+      </div>
+      <div class="step">
+        <p><strong>Now tick "hair-trigger every threshold".</strong> All seven monitors, every threshold aggressive. Coverage in the sense people usually mean it is perfect: every defect fires a page. Detection collapses to 15.8 hours and 25 nights out of 30 carry a false page. Three of the five incidents fire into a channel that the model treats as muted.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write down the set you would actually run on Monday</strong> and the one number you would report to a stakeholder. If you pick coverage, the last rung is your set and it is worse than five monitors.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The honest caveat, stated plainly.</strong> The muting rule is a model, not a measurement. What is not a model is the arithmetic that produces 25 false pages from those thresholds against that history: you can hover every night and check it. If you think a real team tolerates more noise than this bench assumes, raise the number and see what happens to the ladder. The direction does not change.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Closing the track</h2>
+      <span class="tag exercise">40 min</span>
+    </div>
+    <ol>
+      <li>Score your own set the way the bench does. Pull your metrics table, list every incident of the last quarter that anybody remembers, and mark which of them your monitors found first. Most teams discover the number is lower than they would have guessed.</li>
+      <li>Count your false pages for the same period. If the channel history is unreadable because nobody triaged it, that is your finding.</li>
+      <li>Delete or retune every monitor that fired more than four times without a real cause. Deleting is allowed and is usually right.</li>
+      <li>Write the one-page version for whoever funds this: three numbers, before and after, plus the tier list from leader session 5. Not a tool comparison.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Two rungs of the ladder both catch 2 of 5 with the same detection time. What separates them?</p>
+      <button class="qopt" type="button">A · The learned pair runs more often, so it gets there first</button>
+      <button class="qopt" type="button">B · The naive pair spends eight false pages to buy exactly the same two catches</button>
+      <button class="qopt" type="button">C · The naive pair catches different defects, so the two are not comparable</button>
+      <p class="qwhy">Identical catches, identical hours, eight false pages against zero. The thresholds were set from a guess rather than from the table's own history, and the whole difference is the noise.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Night 19 is a silent dedup failure: the duplicate rate goes from 1.0 to 8.4 percent while the row count stays normal. Which checks pass on that night?</p>
+      <button class="qopt" type="button">A · Only the freshness check, because the load was on time</button>
+      <button class="qopt" type="button">B · None of them, because a duplicate always changes the row count</button>
+      <button class="qopt" type="button">C · Pipeline success, freshness and volume all pass, and only the duplicate rate sees it</button>
+      <p class="qwhy">A merge key change can duplicate some rows and drop others, landing within a percent of normal. This is the failure class that makes uniqueness worth its own monitor.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">Tightening all seven thresholds makes every defect fire a page, yet mean detection time gets worse than the five-monitor set by a factor of 30. Why?</p>
+      <button class="qopt" type="button">A · 25 false pages in 30 nights mute the channel, so three incidents are found by the stakeholder anyway</button>
+      <button class="qopt" type="button">B · The extra queries slow the warehouse down, delaying the alerts</button>
+      <button class="qopt" type="button">C · Tighter thresholds detect later because they need more history before firing</button>
+      <p class="qwhy">A page that nobody reads is not a detection. The bench models a muted channel above six false pages in a trailing week, which is the documented failure mode of noisy alerting rather than anything exotic.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Detection metrics: MTTD, coverage, alert precision</span>
+        <span class="note">All three computed live against a fixed history, with the trade between them visible in one screen.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Alert fatigue as the constraint on monitoring design</span>
+        <span class="note">Modelled explicitly and labelled as modelled. The direction is well documented in software operations and in clinical alarm research.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">All five signals, evaluated together</span>
+        <span class="note">Freshness, volume, uniqueness, schema and distribution, each carrying the defect only it can see.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Error budgets and SLO practice</span>
+        <span class="note">The exchange-rate framing comes from service reliability. The full apparatus of data SLOs and on-call belongs to its own course in this bucket.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Severity weighting across incidents</span>
+        <span class="note">Not covered by design. Every defect counts the same on this bench, which is not true of a real estate and is the first thing worth adding to your own version.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 8 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Report three numbers</b><span>Caught, false pages, hours to detect. One number hides the trade in whichever direction suits the presenter.</span></div>
+      <div class="cheat-item"><b>Learned beats naive</b><span>Same catches, 8 false pages against 0. No new tooling, just the right history.</span></div>
+      <div class="cheat-item"><b>Uniqueness earns its slot</b><span>Night 19 is invisible to pipeline success, freshness and volume alike.</span></div>
+      <div class="cheat-item"><b>Schema fires on the revert too</b><span>A rollback is a change. Decide in advance whether that is a page.</span></div>
+      <div class="cheat-item"><b>Tightening backfires</b><span>7 monitors at hair-trigger: 2 of 5 caught, 25 false pages, detection back to 15.8 hours.</span></div>
+      <div class="cheat-item"><b>A muted page is not a detection</b><span>The channel is part of the system. Count pages nobody read as misses.</span></div>
+      <div class="cheat-item"><b>Deleting a monitor is progress</b><span>Anything that fired four times without a cause is costing you the ones that matter.</span></div>
+      <div class="cheat-item"><b>Score before you buy</b><span>Run your own quarter through this shape before anybody evaluates a vendor.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 8 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b7-lineage-blast-radius.html">← Builder session 7 · Lineage</a>
+      <a href="../index.html">All sessions →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+<script src="../assets/obs-live.js?v=1"></script>
+</body>
+</html>

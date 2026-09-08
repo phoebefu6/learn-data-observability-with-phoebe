@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 2 of 6. Freshness, volume, schema, distribution and lineage: what each one catches, what each one is blind to, why four of them are nearly free, and the order to buy them in.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Five signals, five ways to find out first - learn data observability with phoebe">
+<meta property="og:description" content="Leader session 2 of 6. Four signals come out of metadata the warehouse already stores. Lineage is a graph somebody has to maintain. Neither substitutes for the other.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/a2-five-signals.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Five signals, five ways to find out first - learn data observability with phoebe">
+<meta name="twitter:description" content="Three checks passed on night 19 and every downstream sum was wrong. Signals are not substitutes.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 2 · Five signals, five ways to find out first - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Leader session 2 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Leader session 2 of 6</div>
+    <h1>Five signals, five ways to <span class="accent">find out first</span></h1>
+    <p class="sub">Last session ended with a number: how many of your incidents a stakeholder reported to you before your team knew. Closing that gap means something has to be watching, and there are five things worth watching. Four of them are almost free, because the warehouse already stores what they need. One of them is a graph that somebody has to build and keep current, and it is the one every vendor demo leads with. Tonight: what each signal catches, what each one cannot see, and the order to buy them in.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundational</span>
+      <span class="chip audience">Data and analytics leaders</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:6">3-24 · The five signals</span>
+      <span class="a3" style="flex:4">24-40 · Build-along: which signals would have caught yours</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where tonight sits</h2>
+    </div>
+    <p class="lede">Session 1 put a price on wrongness and named the three failure shapes: late, short, and wrong-but-complete. Tonight each of those shapes gets matched to the thing that can see it, and you find out that your incident list from last week is really a shopping list. Session 3 then asks which quality dimensions are worth measuring at all, session 4 handles the noise those measurements generate, session 5 decides which tables get any of it, and session 6 turns the lot into three reportable numbers. The table is still <strong>orders_daily</strong> at <strong>Bellwether</strong>, and one of its five buried defects shows up tonight in a way that should make you uncomfortable.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Five signals, each with the failure it catches and the failure it cannot see, in language you can use with a vendor and with a board. A defensible purchase order: which two to start with because they cost nothing, which one catches the class of failure that all the cheap checks miss, and which one to leave until last no matter how good the demo was. And your own incident list marked up against all five, including the one that none of them would have caught.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why five, and why these five<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Worth saying plainly at the start, because it changes how you should read any product page. The five-signal carve-up of freshness, volume, schema, distribution and lineage is <strong>vendor-originated</strong>. It came out of the data observability tool market rather than out of a standards body, and it has since become close to universal: analysts use it, competing vendors use it, and job descriptions use it. That makes it a genuinely useful shared vocabulary and it does not make it a standard.</p>
+        <p>The practical consequence is that nobody owes you these five specifically. There is no compliance argument for having exactly five monitors, and no auditor will ask. What holds up is the underlying logic: <strong>the first four answer "what moved", and lineage answers "why, and what else"</strong>. If a vendor offers you a sixth signal, ask which of those two questions it answers better than what you already have.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's team went into a vendor evaluation with a checklist of five pillars and came out having bought lineage first, because it was the only part of the demo that looked impressive on a projector. Nine weeks later the graph was 60 percent stale, no incident had been detected by anything, and the two checks that would have caught three of their five defects were a scheduled query away and still not written.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The two questions any signal is answering<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Strip away the naming and every monitor in the practice is doing one of two jobs. Keeping them separate saves you from buying the same thing twice.</p>
+        <ul>
+          <li><strong>"What moved?"</strong> A measurement of the table itself, compared against its own past. Did it arrive on time, is it the usual size, does it have the usual columns, do the values look like they usually do. Cheap, mechanical, runs on a schedule, and blind to consequences.</li>
+          <li><strong>"Why, and what else?"</strong> A map of relationships. Where did this table come from, what reads it, who needs telling. Expensive, needs maintaining, and useless for detection on its own because a map does not notice anything.</li>
+        </ul>
+        <p>Detection comes entirely from the first job. Response quality, blast radius and the message you send to stakeholders come from the second. A team that buys only the first has fast detection and chaotic incident handling. A team that buys only the second has beautiful diagrams of a problem that finance found on Monday.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers all five signals, what each catches and what each misses</span>
+      <h2>The five signals, and what each one is blind to</h2>
+      <span class="tag concept">12 min live</span>
+    </div>
+    <p class="lede">Every signal below is defined by two things: the failure it catches, and the failure it walks straight past. The second half is the half that gets left out of product pages, and it is the half that decides how many of these you need.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four signals grouped as free: freshness catches late arrival but is blind to wrong values, volume catches a missing shard but is blind to wrong rows in a normal-sized load, schema catches dropped or retyped columns but is blind to wrong contents, distribution catches null rate and range shifts but is blind to shifts inside the normal range. Lineage sits apart: it catches nothing on its own and costs real work to maintain, but it answers why the table broke and what else is now wrong.">
+        <style>
+          .a2aHd { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a2aPL { font: 800 12px Inter, sans-serif; fill: #075985; }
+          .a2aT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .a2aTi { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a2aC { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .a2aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a2aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="a2aHd" x="14" y="24">Four signals are already paid for. The fifth is a project.</text>
+
+        <rect x="14" y="44" width="520" height="272" rx="14" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a2aPL" x="30" y="68">Free: one aggregate query each, no new tooling</text>
+
+        <rect x="30" y="84" width="150" height="44" rx="9" fill="#0369A1"></rect>
+        <text class="a2aT" x="105" y="112" text-anchor="middle">Freshness</text>
+        <text class="a2aC" x="196" y="100">Catches: the table is late, or never came</text>
+        <text class="a2aM" x="196" y="118">Blind to: on-time data with wrong values</text>
+
+        <rect x="30" y="140" width="150" height="44" rx="9" fill="#0369A1"></rect>
+        <text class="a2aT" x="105" y="168" text-anchor="middle">Volume</text>
+        <text class="a2aC" x="196" y="156">Catches: a partial load, a missing shard</text>
+        <text class="a2aM" x="196" y="174">Blind to: wrong rows in a normal-sized load</text>
+
+        <rect x="30" y="196" width="150" height="44" rx="9" fill="#0369A1"></rect>
+        <text class="a2aT" x="105" y="224" text-anchor="middle">Schema</text>
+        <text class="a2aC" x="196" y="212">Catches: a dropped or retyped column</text>
+        <text class="a2aM" x="196" y="230">Blind to: same columns, wrong contents</text>
+
+        <rect x="30" y="252" width="150" height="44" rx="9" fill="#0369A1"></rect>
+        <text class="a2aT" x="105" y="280" text-anchor="middle">Distribution</text>
+        <text class="a2aC" x="196" y="268">Catches: null rate and range shifts</text>
+        <text class="a2aM" x="196" y="286">Blind to: a shift inside the normal range</text>
+
+        <rect x="558" y="44" width="308" height="272" rx="14" fill="#fff" stroke="#C3D4E0"></rect>
+        <text class="a2aPL" x="574" y="68">Costs real work to maintain</text>
+
+        <rect x="574" y="84" width="150" height="44" rx="9" fill="#38BDF8"></rect>
+        <text class="a2aTi" x="649" y="112" text-anchor="middle">Lineage</text>
+
+        <text class="a2aC" x="574" y="156">Catches: nothing on its own.</text>
+        <text class="a2aM" x="574" y="174">It answers why the table broke</text>
+        <text class="a2aM" x="574" y="192">and what else is wrong now.</text>
+
+        <text class="a2aC" x="574" y="228">Needs a parsed dependency</text>
+        <text class="a2aM" x="574" y="246">graph, plus every dashboard,</text>
+        <text class="a2aM" x="574" y="264">model and export mapped</text>
+        <text class="a2aM" x="574" y="282">and kept current.</text>
+
+        <rect x="14" y="330" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a2aN" x="38" y="342">The first four answer what moved. Lineage answers why, and what else moved with it.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - each signal with the failure it catches and the failure it cannot see.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Freshness: did it arrive when it was promised<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it measures.</strong> The gap between when the data was supposed to be current and when it actually was. Every table your business reads has an implied promise attached to it, usually something like "by 06:00 on a working day", and freshness is the check that the promise was kept.</p>
+        <p><strong>The failure it catches.</strong> Late and missing arrivals. A source that stopped sending, a job that queued behind something else, a weekend backlog that never cleared. In Bellwether's history one night landed 230 minutes past the 06:00 promise when the usual worst case is around 22 minutes, and freshness is the only signal that sees it.</p>
+        <p><strong>What it cannot see.</strong> Anything about the contents. A table can be perfectly punctual and completely wrong, and freshness will report a clean night forever. There is also a specific trap: a table rebuilt in full every night looks fresh even when the source stopped producing events a week ago, because the timestamp records the write rather than the event.</p>
+        <div class="callout tip">
+          <p><strong>The leadership question.</strong> Not "is it fresh" but "what is the promise, who made it, and does the business know what it is?" Half of all freshness disputes turn out to be an undocumented expectation rather than a late table.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Volume: is it the usual size for this kind of day<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it measures.</strong> How many rows landed, compared against how many usually land on a day like today. The comparison is the whole signal; a row count on its own is a number with no meaning.</p>
+        <p><strong>The failure it catches.</strong> Partial loads. A missing regional shard, a truncated file, a filter that got tighter upstream, a duplicate load that doubled everything. This is the shape behind Bellwether's finance incident: 41 percent of a normal same-weekday count, for two business days, with nothing failing.</p>
+        <p><strong>What it cannot see.</strong> A normal-sized load of wrong rows. If something upstream replaced every value in a column but kept the row count, volume reports a textbook night. It is also the signal most likely to be switched off in its first month, because grocery orders on a Saturday are not grocery orders on a Tuesday and a threshold naive enough to ignore that fires every weekend.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Schema: are the columns still the columns<span class="mini">2 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it measures.</strong> The set of columns, their names and their types, compared against yesterday. The warehouse already keeps this list, so the check is a comparison rather than a computation.</p>
+        <p><strong>The failure it catches.</strong> Structural change without notice. A column dropped, renamed, or retyped from integer to string by an upstream team who had no idea anybody was reading it. In Bellwether's history one night lost <strong>ship_region</strong> and gained <strong>promo_code</strong>, which broke a regional report while leaving every count and timestamp perfectly normal.</p>
+        <p><strong>What it cannot see.</strong> Contents. The same columns can carry entirely wrong values and schema will not blink. It also has a governance quirk worth knowing before you approve an alerting policy: a schema monitor fires on the <em>revert</em> too, because rolling a change back is itself a change. Whether that counts as an alert is a decision somebody has to make in advance rather than at 07:00.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Distribution: do the values look like themselves<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it measures.</strong> The shape of the values rather than the values themselves. Null rate per column, how many distinct values a key has, minimum and maximum, and the share each segment usually holds. All of it computable in a single pass over the table.</p>
+        <p><strong>The failure it catches.</strong> Silent corruption inside a healthy-looking table. This is the only family that sees the wrong-but-complete shape from session 1. Bellwether has a night where <strong>customer_id</strong> null rate goes from 0.5 percent to 11.4 percent: on time, right size, right columns, and one in nine orders no longer attributable to a customer.</p>
+        <p><strong>What it cannot see.</strong> A shift that stays inside the normal range. If a price column that usually sits between 2 and 90 euro gets systematically inflated by 10 percent, nothing about its shape looks unusual and no metadata check will notice. That failure needs either a business rule written down as an assertion or genuine statistical anomaly detection, and both are separate disciplines with their own tooling.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Lineage: why, and what else is wrong<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it measures.</strong> Nothing. This is the point most easily missed in a demo. Lineage is a graph of what feeds what, and a graph does not detect anything, because detection requires something to be measured over time and compared.</p>
+        <p><strong>What it buys instead.</strong> Two things, both valuable and neither of them detection.</p>
+        <ul>
+          <li><strong>Cause.</strong> When a table breaks, the graph shortens the hunt for which upstream thing changed from an afternoon of asking people to a couple of clicks. That is resolution time, not detection time.</li>
+          <li><strong>Blast radius.</strong> When a table breaks, the graph tells you the eleven dashboards, four models, two exports and one undocumented push into the CRM that read it. That is who you have to warn, and it is the difference between one honest message and a fortnight of trust damage.</li>
+        </ul>
+        <p><strong>What it costs.</strong> More than the other four combined, and the cost is ongoing rather than one-off. A dependency graph parsed from your transform code is achievable. A graph that also covers reports built by three teams in two BI tools, plus spreadsheets, plus the reverse-ETL job, is a maintenance commitment. A lineage graph that is 60 percent current is worse than none, because people trust it and then act on the missing 40 percent.</p>
+        <p><strong>Why it still matters to you specifically.</strong> Lineage is the signal that improves your <em>message</em>. Session 1 argued that the real cost of an incident is the trust damage, and trust damage is mostly caused by stakeholders discovering for themselves that they were affected. The graph is how you get to them first.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers why the five are not interchangeable and the order to buy them</span>
+      <h2>Signals are not substitutes</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">The tempting simplification is that with limited budget you pick the best one or two and get most of the value. It is a reasonable instinct and the arithmetic does not support it, because each signal is the only thing that can see a whole class of failure. Here is the night that makes the case.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 336" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Night 19 at Bellwether shown as four checks. Pipeline success passes, freshness passes because the load landed 11 minutes after the promise, volume passes because the row count is within 1 percent of the weekday median, and uniqueness fails because the duplicate rate went from 1.0 to 8.4 percent. Underneath, the true state of the table: duplicated order rows and dropped rows nearly cancelled in the total, so every downstream sum was wrong while the count looked normal.">
+        <style>
+          .a2bHd { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a2bTi { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .a2bP { font: 800 11px Inter, sans-serif; fill: #0C1B26; }
+          .a2bF { font: 800 11px Inter, sans-serif; fill: #991B1B; }
+          .a2bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a2bW { font: 400 11px Inter, sans-serif; fill: #fff; }
+          .a2bWT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .a2bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="a2bHd" x="14" y="24">Night 19: a merge key changed upstream and nobody said so</text>
+
+        <rect x="14" y="44" width="198" height="118" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a2bTi" x="113" y="70" text-anchor="middle">Pipeline success</text>
+        <rect x="58" y="84" width="110" height="26" rx="7" fill="#BAE6FD"></rect>
+        <text class="a2bP" x="113" y="101" text-anchor="middle">PASS</text>
+        <text class="a2bM" x="113" y="130" text-anchor="middle">the job ran and exited 0</text>
+        <text class="a2bM" x="113" y="146" text-anchor="middle">with nothing to report</text>
+
+        <rect x="232" y="44" width="198" height="118" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a2bTi" x="331" y="70" text-anchor="middle">Freshness</text>
+        <rect x="276" y="84" width="110" height="26" rx="7" fill="#BAE6FD"></rect>
+        <text class="a2bP" x="331" y="101" text-anchor="middle">PASS</text>
+        <text class="a2bM" x="331" y="130" text-anchor="middle">landed 11 min after the</text>
+        <text class="a2bM" x="331" y="146" text-anchor="middle">06:00 promise</text>
+
+        <rect x="450" y="44" width="198" height="118" rx="10" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a2bTi" x="549" y="70" text-anchor="middle">Volume</text>
+        <rect x="494" y="84" width="110" height="26" rx="7" fill="#BAE6FD"></rect>
+        <text class="a2bP" x="549" y="101" text-anchor="middle">PASS</text>
+        <text class="a2bM" x="549" y="130" text-anchor="middle">row count within 1 percent</text>
+        <text class="a2bM" x="549" y="146" text-anchor="middle">of the weekday median</text>
+
+        <rect x="668" y="44" width="198" height="118" rx="10" fill="#F0F9FF" stroke="#991B1B"></rect>
+        <text class="a2bTi" x="767" y="70" text-anchor="middle">Uniqueness</text>
+        <rect x="712" y="84" width="110" height="26" rx="7" fill="#fff" stroke="#991B1B" stroke-width="2"></rect>
+        <text class="a2bF" x="767" y="101" text-anchor="middle">FAIL</text>
+        <text class="a2bM" x="767" y="130" text-anchor="middle">duplicate rate 1.0 to 8.4</text>
+        <text class="a2bM" x="767" y="146" text-anchor="middle">percent overnight</text>
+
+        <rect x="14" y="182" width="852" height="106" rx="12" fill="#075985"></rect>
+        <text class="a2bWT" x="30" y="208">What was actually in the table that morning</text>
+        <text class="a2bW" x="30" y="232">8.4 percent of order rows duplicated, and a slice of real orders dropped in the same merge.</text>
+        <text class="a2bW" x="30" y="252">Duplicates and drops nearly cancelled in the total, which is why the row count looked normal.</text>
+        <text class="a2bW" x="30" y="272">Revenue by region was overstated in three dashboards and one export into the CRM.</text>
+
+        <rect x="14" y="304" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a2bN" x="38" y="316">Three passing checks are not three pieces of evidence. All three watched the same thing.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - three passes, one fail, and the fail is the only honest reading.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why each signal earns its slot<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Bellwether has five defects buried in one month of history. What makes them a good teaching set is that <strong>each one is visible to exactly one signal</strong>, which is not a coincidence of the example so much as the reason the five-signal carve-up caught on in the first place.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>What happened</th><th>Seen only by</th><th>Everything else reported</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Landed 230 minutes past the 06:00 promise</td><td>Freshness</td><td>A clean night</td></tr>
+            <tr><td>One of three shards missing, 41 percent of normal</td><td>Volume</td><td>A clean night</td></tr>
+            <tr><td>Merge key changed, duplicate rate 1.0 to 8.4 percent</td><td>Uniqueness</td><td>A clean night</td></tr>
+            <tr><td>A column dropped, another added</td><td>Schema diff</td><td>A clean night</td></tr>
+            <tr><td>Customer id null rate 0.5 to 11.4 percent</td><td>Null rate</td><td>A clean night</td></tr>
+          </tbody>
+        </table>
+        <p>Read the third column. Every row of it says that the other checks were not silent, they were <em>reassuring</em>. That is the specific danger of a partial programme: it does not merely fail to catch things, it actively produces evidence that nothing is wrong, and people quite reasonably believe it.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>What a single-signal programme misses<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Most programmes start and stop with freshness, because it is the easiest to explain and the easiest to buy. Follow that through against those five defects and the result is one caught out of five, and a dashboard that says the pipeline is healthy on the other four nights.</p>
+        <ul>
+          <li><strong>Freshness only.</strong> Catches the late night. Reports clean on the short night, the duplicate night, the schema night and the null night. Your discovery gap barely moves, because the four it misses are the four that stakeholders find.</li>
+          <li><strong>Freshness plus volume.</strong> Catches two of five, and these two are genuinely the most common shapes in most estates, so this is a reasonable starting position rather than a token one.</li>
+          <li><strong>Everything except uniqueness.</strong> The trap. Feels comprehensive, misses the entire silent class where the row count stays normal, and those are the incidents with the longest detection times because nothing about them looks odd to anybody.</li>
+          <li><strong>Lineage only.</strong> Catches nothing, by construction. Excellent incident response, no incidents detected. Worth stating in exactly those words when a proposal arrives that leads with a graph.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The order to buy them in<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Cost and coverage do not line up, which is lucky, because the cheapest signals cover the most common failures. That gives a defensible sequence, and it is very close to the reverse of the order a product demo presents them in.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Order</th><th>Signal</th><th>Why here</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Freshness</td><td>Free, one number the warehouse already keeps, and covers the single most common complaint</td></tr>
+            <tr><td>2</td><td>Volume</td><td>Free, catches partial loads, and the same-day-of-week comparison is arithmetic rather than tooling</td></tr>
+            <tr><td>3</td><td>Uniqueness</td><td>Still cheap, and it is the only thing that sees the silent class where counts look normal</td></tr>
+            <tr><td>4</td><td>Schema</td><td>Cheap to compute, but needs a policy decision first about whether additive changes and reverts page anybody</td></tr>
+            <tr><td>5</td><td>Distribution</td><td>Cheap per column, expensive in judgement: which columns, which baseline, how much noise you will absorb</td></tr>
+            <tr><td>6</td><td>Lineage</td><td>Highest cost and highest ongoing maintenance, and it detects nothing. Buy it when your detection already works</td></tr>
+          </tbody>
+        </table>
+        <p>Two caveats before you use this as a plan. The order assumes you have the tables tiered, which is session 5, because running six signals across four hundred tables is how you end up with the noise problem in session 4. And steps 1 to 3 are days of work rather than a procurement cycle, which means the honest first ask is often a fortnight of somebody's time rather than a licence.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Which signals would have caught yours</h2>
+      <span class="tag demo">★ 16 min · everyone builds</span>
+    </div>
+    <p class="lede">Get out the incident log from session 1. Five signals, five new columns, and by the end of this you have your own version of the table in part 2 with your own incidents in it. This is the exercise that turns "we should invest in observability" into a named, ordered, costed list.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Add five columns and tick the ones that would have caught each incident.</strong> Freshness, volume, uniqueness or schema, distribution, lineage. Be strict: the question is not whether the signal is related to the incident, it is whether a check on that signal, with a sensible threshold, would have fired on that night. If it needed an unreasonably tight threshold to fire, it does not count, and session 4 explains why.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Your log, five columns wider</span>
+Table  |  What went wrong  |  Found by  |  Hours  |  Fresh  |  Vol  |  Uniq  |  Schema  |  Dist
+
+orders_daily  |  one shard gone, 41 pct of normal  |  finance   |  26  |  no   |  YES  |  no   |  no   |  no
+customer_dim  |  duplicate keys after a migration     |  analyst   |   9  |  no   |  no   |  YES  |  no   |  no
+revenue_wk    |  currency column retyped to text      |  the CFO   |  31  |  no   |  no   |  no   |  YES  |  no
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>Count the ones that needed uniqueness or schema.</strong> These are the incidents that the two cheap and popular signals cannot see. In most groups the count is between a quarter and a third of the list, which is the number that justifies steps 3 and 4 of the buy order rather than stopping at freshness and volume. If your count is zero, check whether you are missing that class of incident rather than not having it.</p>
+      </div>
+      <div class="step">
+        <p><strong>Mark the hours column against the ticks.</strong> Take the average hours-wrong for incidents that one of your first three signals would have caught, and compare it with the average for the rest. The second group is almost always several times worse, because a defect that no cheap check can see stays live until a human trips over it.</p>
+      </div>
+      <div class="step">
+        <p><strong>Find the one that no signal would have caught.</strong> There is usually exactly one, and it is worth its own conversation. Typically it is a business-rule violation: a value that was inside the normal range and still wrong, a total that reconciled against itself and not against the source system, a rule that only one person in finance knows. No amount of metadata monitoring sees these.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the ask.</strong> Three lines: how many of your incidents the first two signals would have caught, how many more the third and fourth add, and what each stage costs in time rather than licences. Bring it to session 5, where it meets the list of tables and becomes a plan.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The one that got away belongs to a different discipline.</strong> A rule like "every order must have a delivery slot in the future" is not a property of the table's shape, it is a statement about the business, and it lives as a row-level assertion in whichever project builds the table. Row-level assertions at build time and metadata monitors on a schedule are complementary layers, and a team that tries to make one do the other's job ends up with both badly done. Point that incident at whoever owns the transform code, and keep it out of the monitoring plan.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 3</h2>
+      <span class="tag exercise">20 min</span>
+    </div>
+    <ol>
+      <li>Finish the five-column markup on your whole incident log, then show it to whoever would build the checks. They will disagree with at least two of your ticks, and the disagreements are the useful part.</li>
+      <li>For your top table, write down the promise: by what time, on which days, at roughly what size. If nobody can state it, that is your first finding, and it is a more common one than a late table.</li>
+      <li>Ask whether anything already maintains a dependency graph in your estate, and if so, when it was last accurate. Transform tools often generate one that nobody has looked at. A stale graph is a liability rather than an asset.</li>
+      <li>Write one sentence for each of the five signals, in your own words, that you could say to a vendor without reading it off a slide. Session 3 assumes you can.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">On night 19 the merge key changed, the duplicate rate went from 1.0 to 8.4 percent, and the row count stayed normal. Which checks reported a clean night?</p>
+      <button class="qopt" type="button">A · None, because a duplicate always changes the row count</button>
+      <button class="qopt" type="button">B · Only freshness, because the load was punctual</button>
+      <button class="qopt" type="button">C · Pipeline success, freshness and volume all passed, and only uniqueness saw it</button>
+      <p class="qwhy">Duplicates and dropped rows nearly cancelled in the total, so the count landed within a percent of the median. Three checks reported reassuringly while every downstream sum was wrong, which is the whole argument for uniqueness having its own monitor.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A proposal arrives that leads with column-level lineage and would take a quarter to deliver. What is the strongest objection?</p>
+      <button class="qopt" type="button">A · Lineage detects nothing on its own, so a quarter of work would leave the discovery gap exactly where it is</button>
+      <button class="qopt" type="button">B · Lineage is vendor-originated framing and therefore not worth having</button>
+      <button class="qopt" type="button">C · Column-level lineage is technically infeasible on most warehouses</button>
+      <p class="qwhy">Lineage is a map, and a map notices nothing. It shortens the hunt for cause and it tells you who to warn, both of which are genuinely valuable, and neither of which reduces the hours a table was wrong before anybody knew.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Why is the five-signal framing worth using even though it came out of the vendor market rather than a standards body?</p>
+      <button class="qopt" type="button">A · Because analyst firms have since ratified it as a formal standard</button>
+      <button class="qopt" type="button">B · Because it is a near-universal shared vocabulary, and the underlying split holds: four signals answer what moved, lineage answers why and what else</button>
+      <button class="qopt" type="button">C · Because five is the minimum number of monitors an auditor expects on a critical table</button>
+      <p class="qwhy">No standards body publishes these five and no auditor asks for them. What makes the carve-up useful is that everyone in the market uses the same words, and that the two questions underneath it are real and genuinely different.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The five signals of data observability</span>
+        <span class="note">All five taught with what each catches and what each is blind to, plus which four come from metadata the warehouse already stores.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Provenance of the five-pillar framing</span>
+        <span class="note">Stated as vendor-originated and now near-universal, a useful shared vocabulary rather than a standard. No standards body publishes it.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Signals as non-substitutes, and the order to buy them in</span>
+        <span class="note">Five defects, each visible to exactly one signal, with the cost and coverage sequence that follows from it.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Quality dimensions: DAMA-DMBOK and ISO/IEC 25012</span>
+        <span class="note">Session 3 compares the two properly, including the uniqueness gap and how to pick the three worth measuring.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Threshold noise and alert fatigue</span>
+        <span class="note">Named tonight wherever a signal is easy to mis-tune. Session 4 puts a cost on false pages and on a muted channel.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Row-level assertions and statistical anomaly detection</span>
+        <span class="note">Not covered by design. Business-rule assertions belong with whoever builds the table, and value-level detectors are their own discipline.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 2 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Freshness</b><span>Catches late and missing. Blind to punctual data that is wrong. Start with the promise, not the check.</span></div>
+      <div class="cheat-item"><b>Volume</b><span>Catches partial loads and missing shards. Blind to a normal-sized load of wrong rows.</span></div>
+      <div class="cheat-item"><b>Schema</b><span>Catches dropped, renamed and retyped columns. Blind to contents. Decide in advance if a revert pages anybody.</span></div>
+      <div class="cheat-item"><b>Distribution</b><span>Catches null rate, cardinality and range shifts. Blind to a shift inside the normal range.</span></div>
+      <div class="cheat-item"><b>Lineage</b><span>Detects nothing. Buys cause and blast radius, and costs more to maintain than the other four combined.</span></div>
+      <div class="cheat-item"><b>Four free, one project</b><span>Four come from metadata already stored. Lineage is a graph somebody keeps current, or it is a liability.</span></div>
+      <div class="cheat-item"><b>Night 19</b><span>Duplicate rate 1.0 to 8.4 percent with a normal row count. Three checks passed and reassured everybody.</span></div>
+      <div class="cheat-item"><b>Buy order</b><span>Freshness, volume, uniqueness, schema, distribution, lineage last. Roughly the reverse of a demo.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Leader session 2 of 6 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="a1-what-breaks.html">← Leader session 1 · What breaks</a>
+      <a href="a3-quality-dimensions.html">Leader session 3 · Quality dimensions →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

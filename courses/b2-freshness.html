@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 2 of 8. A fixed deadline encodes a guess. Lateness is a distribution with a tail, and a trailing percentile is a threshold that learns. Plus the two traps that make a freshness check pass on a table with no new data.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Freshness: on-time is a distribution - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 2 of 8. Build a freshness monitor whose threshold comes from the table's own history, then break it two ways on purpose.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b2-freshness.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Freshness: on-time is a distribution - learn data observability with phoebe">
+<meta name="twitter:description" content="Trailing p95 plus a pad, the full-rebuild trap, and the empty partition that passes every check.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 2 · Freshness: on-time is a distribution - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 2 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 2 of 8</div>
+    <h1>Freshness: on-time is a <span class="accent">distribution</span></h1>
+    <p class="sub">Every freshness monitor starts life as a clock time somebody picked in a meeting. It works, right up until the night the pipeline is fifteen minutes slower than usual for an ordinary reason and somebody gets paged. Tonight the threshold stops being a guess and starts coming out of the table's own history, and then you break the whole check twice on purpose, because both of those breaks pass silently on a table that has held no new data for a week.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · Why a deadline is the wrong shape</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: the learned freshness monitor</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where freshness sits in the monitor set</h2>
+    </div>
+    <p class="lede">The metrics table from session 1 now holds one row per table per night: <code class="mono">table_name, load_date, rows, distinct_keys, max_updated_at, late_minutes, null_rate_customer, column_count</code>. That single column <code class="mono">late_minutes</code> is enough to build a freshness monitor whose threshold nobody has to defend in a meeting, because the history defends it. <strong>analytics.orders_daily</strong> at Bellwether is promised by 06:00, carries about 12,000 rows on a weekday and 9 columns, and the eight clean nights already recorded landed 8, 14, 6, 19, 11, 22, 9 and 17 minutes past.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> A freshness monitor whose threshold is a trailing p95 plus a 10-minute pad, which on this history fires on night 9 and on nothing else. The two reasons a passing freshness check can be meaningless, both of which you can reproduce in five minutes on a table you own. And the arithmetic that shows what happens when you tighten that same monitor to p75 plus a minute.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>What a fixed deadline actually encodes<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Bellwether promises orders_daily by 06:00 and the first monitor fired if the table landed more than 30 minutes past. Where did 30 come from? From looking at the recorded nights and picking a number that none of them exceeded. That is the whole method, and it is worth saying out loud, because once you can see it you can see what it costs: the number encodes <em>a guess that no clean night in your history exceeded</em>, frozen at the moment you guessed it.</p>
+        <p>Two things then happen. The pipeline gets slower over a quarter as the source grows, the clean nights drift up towards 30, and one ordinary Tuesday tips over it. Or somebody optimises the load, every night now lands in 4 minutes, and the deadline is 26 minutes of slack that would hide a genuinely broken night. A fixed deadline is right on the day you set it and slowly wrong afterwards, in a direction you cannot predict.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's night 9 landed 230 minutes after the 06:00 promise because an upstream export job retried twice. The trailing p95 of the fourteen nights before it was 22 minutes. Both the fixed 30-minute deadline and the learned threshold catch that night, which is the point worth noticing: on the incident they agree, and the difference between them shows up entirely on the quiet nights.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The three questions a freshness check can answer<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>These get conflated constantly, and the conflation is what produces a monitor that is green while the dashboard is wrong.</p>
+        <ul>
+          <li><strong>Did the job run?</strong> Answered by the orchestrator's own run history. Useful, and the cheapest of the three, and the one that tells you least about the data.</li>
+          <li><strong>Was the table written to?</strong> Answered by <code class="mono">max(updated_at)</code> when that column is the row-write time. A full rebuild and an empty load both satisfy it.</li>
+          <li><strong>Is the data current?</strong> Answered only by a timestamp that belongs to the source event, compared against the promise that was made to the reader. This is the question the stakeholder is asking, and the other two are proxies for it.</li>
+        </ul>
+        <p>A monitor is worth what its question is worth. If you can only get the second one, ship the second one and write down which question it answers, so that the first time it is green during an incident nobody is surprised.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers lateness as a distribution and trailing percentiles</span>
+      <h2>A deadline answers a different question</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">"Was it late?" is a yes-or-no question about a number that is not yes-or-no. Lateness is a series with a centre, a spread and almost always a tail, and once you plot it the threshold nearly picks itself.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lateness in minutes past the 06:00 promise. Eight clean nights cluster between 6 and 22 minutes. A dashed line marks the trailing p95 at 22 minutes, a bracket shows the 10 minute pad, and the monitor threshold sits at 32 minutes. A fixed 30 minute deadline is drawn for comparison. Night 9 sits far to the right at 230 minutes, past a break in the axis.">
+        <style>
+          .b2aH { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .b2aB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b2aL { font: 700 11px Inter, sans-serif; fill: #075985; }
+          .b2aR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .b2aT { font: 400 10px Inter, sans-serif; fill: #55697A; }
+          .b2aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b2aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <text class="b2aH" x="14" y="24">Lateness in minutes past the 06:00 promise</text>
+        <text class="b2aB" x="14" y="42">eight clean nights, then the incident</text>
+
+        <line x1="339.5" y1="90" x2="339.5" y2="250" stroke="#0369A1" stroke-width="1.5" stroke-dasharray="5 4"></line>
+        <text class="b2aL" x="339.5" y="82" text-anchor="middle">trailing p95 = 22</text>
+
+        <line x1="462" y1="118" x2="462" y2="250" stroke="#075985" stroke-width="2.5"></line>
+        <text class="b2aL" x="470" y="132">monitor fires above 32</text>
+
+        <line x1="343" y1="104" x2="458" y2="104" stroke="#075985" stroke-width="1.2" marker-end="url(#b2aAr)"></line>
+        <text class="b2aB" x="400" y="98" text-anchor="middle">10 min pad</text>
+
+        <line x1="437.5" y1="196" x2="437.5" y2="250" stroke="#B45309" stroke-width="1.5" stroke-dasharray="4 3"></line>
+        <text class="b2aB" x="437.5" y="292" text-anchor="middle">fixed deadline 30 min</text>
+        <line x1="437.5" y1="278" x2="437.5" y2="256" stroke="#B45309" stroke-width="1" stroke-dasharray="3 3"></line>
+
+        <line x1="70" y1="250" x2="560" y2="250" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="620" y1="250" x2="835" y2="250" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <path d="M566,258 L578,242 L590,258 L602,242 L614,258" fill="none" stroke="#C3D4E0" stroke-width="1.5"></path>
+
+        <text class="b2aT" x="70" y="268" text-anchor="middle">0</text>
+        <text class="b2aT" x="192" y="268" text-anchor="middle">10</text>
+        <text class="b2aT" x="315" y="268" text-anchor="middle">20</text>
+        <text class="b2aT" x="560" y="268" text-anchor="middle">40</text>
+        <text class="b2aT" x="620" y="268" text-anchor="middle">220</text>
+        <text class="b2aT" x="835" y="268" text-anchor="middle">240</text>
+
+        <text class="b2aB" x="240" y="172" text-anchor="middle">eight clean nights</text>
+
+        <circle cx="143.5" cy="232" r="6" fill="#0369A1"></circle>
+        <circle cx="168" cy="232" r="6" fill="#0369A1"></circle>
+        <circle cx="180.25" cy="214" r="6" fill="#0369A1"></circle>
+        <circle cx="204.75" cy="232" r="6" fill="#0369A1"></circle>
+        <circle cx="241.5" cy="232" r="6" fill="#0369A1"></circle>
+        <circle cx="278.25" cy="232" r="6" fill="#0369A1"></circle>
+        <circle cx="302.75" cy="214" r="6" fill="#0369A1"></circle>
+        <circle cx="339.5" cy="232" r="6" fill="#0369A1"></circle>
+
+        <circle cx="725" cy="232" r="9" fill="#991B1B"></circle>
+        <text class="b2aR" x="725" y="212" text-anchor="middle">night 9</text>
+        <text class="b2aR" x="725" y="196" text-anchor="middle">230 min</text>
+
+        <rect x="14" y="304" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b2aN" x="38" y="316">A trailing threshold moves with the table. A fixed deadline never updates itself.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the two thresholds agree on night 9 and disagree on every quiet night.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Reading the shape before you pick a number<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Plot 30 nights of <code class="mono">late_minutes</code> before you write any threshold. There are three shapes you will see, and each one wants a different monitor.</p>
+        <ul>
+          <li><strong>A tight cluster with a tail.</strong> Most nights sit within a few minutes of each other and one night in fifteen is much later because something retried. This is the common case, and a high trailing percentile handles it: the tail nights are inside the threshold, and the genuinely broken night is an order of magnitude past it.</li>
+          <li><strong>Genuinely bimodal.</strong> Two clumps, say around 8 minutes and around 40, with nothing in between. That is almost always two different jobs writing the table, or one job with two code paths. A single threshold on the combined series either pages on every slow-path night or is so wide it protects nothing. Split the series by whatever distinguishes the two modes and monitor each, or fix the pipeline so there is one path.</li>
+          <li><strong>A drifting centre.</strong> The median creeps up week over week. A trailing window follows the drift, which is what you want for a monitor and exactly what you do not want for capacity planning. Alert on the deviation, and report the trend separately to whoever owns the load.</li>
+        </ul>
+        <div class="callout tip">
+          <p><strong>The window length is a real decision.</strong> Fourteen nights is long enough to include a weekend and a slow night, and short enough that a deliberate change to the schedule washes through in two weeks. Shorter than about seven and the percentile is unstable enough to fire on its own noise. Much longer than a month and a threshold keeps defending a pipeline that no longer exists.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why a percentile and not a mean plus standard deviations<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Mean plus three standard deviations is the reflex, and on lateness it behaves badly for a specific reason: the tail you are trying to tolerate is also in the history, and it inflates the standard deviation that sets your threshold. One 230-minute night in the trailing window and the mean-plus-3sd threshold jumps far enough to swallow the next real incident.</p>
+        <p>A high percentile is robust in the direction that matters. One extreme value moves a p95 by at most one rank position, so a threshold set from a trailing p95 barely notices an incident that has already happened. That is the property you want in a monitor, because your history will contain the incidents you are trying to detect.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Threshold</th><th>Behaves well when</th><th>Fails when</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Fixed clock time</td><td>The promise is contractual and the load is stable</td><td>The pipeline drifts, in either direction</td></tr>
+            <tr><td>Trailing percentile plus a pad</td><td>Lateness is a cluster with a tail</td><td>The series is bimodal, or you have under a week of history</td></tr>
+            <tr><td>Trailing mean plus 3 sd</td><td>The series is roughly symmetric with no tail</td><td>An incident is inside the window and widens the band</td></tr>
+            <tr><td>Median plus a multiple of MAD</td><td>You want robustness and have no seasonality</td><td>The weekly rhythm is strong, which for volume it usually is</td></tr>
+          </tbody>
+        </table>
+        <p>The pad matters as much as the percentile. A threshold of exactly p95 fires on roughly one night in twenty by construction, which is a page every three weeks for nothing. Adding a fixed pad in the units of the thing you are measuring, 10 minutes here, moves the monitor out of the noise without making it insensitive: night 9 at 230 minutes clears a 32-minute threshold by a factor of seven.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the full-rebuild and empty-partition traps</span>
+      <h2>The two traps that make a freshness check lie</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">Both of these produce a green freshness check on a table that has held no new data for a week. Neither is exotic, both are the default behaviour of common pipeline shapes, and the fix for each is one line of thinking rather than a tool.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two stacked timelines over eight nights. The top timeline shows source events arriving on night 1 and nothing after that. The bottom timeline shows the row-write timestamp updating on all eight nights, because the table is rebuilt in full every night. The freshness check reads the bottom timeline and passes every night.">
+        <style>
+          .b2bH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b2bB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b2bQ { font: 600 11px "SFMono-Regular", Menlo, monospace; fill: #082F44; }
+          .b2bT { font: 400 10px Inter, sans-serif; fill: #55697A; }
+          .b2bR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .b2bW { font: 800 11px Inter, sans-serif; fill: #fff; }
+          .b2bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="b2bH" x="14" y="24">The full-rebuild trap, over eight nights</text>
+
+        <text class="b2bH" x="14" y="92">Source events</text>
+        <text class="b2bB" x="14" y="108">what upstream made</text>
+        <text class="b2bR" x="150" y="62">nothing arrives after night 1</text>
+
+        <rect x="152" y="84" width="26" height="34" rx="4" fill="#0369A1"></rect>
+        <rect x="242" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="332" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="422" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="512" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="602" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="692" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <rect x="782" y="100" width="26" height="18" rx="4" fill="none" stroke="#991B1B" stroke-width="1.4" stroke-dasharray="4 3"></rect>
+        <line x1="145" y1="118" x2="826" y2="118" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <text class="b2bT" x="165" y="134" text-anchor="middle">n1</text>
+        <text class="b2bT" x="255" y="134" text-anchor="middle">n2</text>
+        <text class="b2bT" x="345" y="134" text-anchor="middle">n3</text>
+        <text class="b2bT" x="435" y="134" text-anchor="middle">n4</text>
+        <text class="b2bT" x="525" y="134" text-anchor="middle">n5</text>
+        <text class="b2bT" x="615" y="134" text-anchor="middle">n6</text>
+        <text class="b2bT" x="705" y="134" text-anchor="middle">n7</text>
+        <text class="b2bT" x="795" y="134" text-anchor="middle">n8</text>
+
+        <text class="b2bH" x="14" y="222">The row write</text>
+        <text class="b2bQ" x="14" y="240">max(updated_at)</text>
+        <text class="b2bB" x="150" y="180">the rebuild runs and stamps every row with now</text>
+
+        <rect x="152" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="242" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="332" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="422" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="512" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="602" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="692" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <rect x="782" y="200" width="26" height="48" rx="4" fill="#38BDF8"></rect>
+        <line x1="145" y1="248" x2="826" y2="248" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <rect x="152" y="256" width="656" height="20" rx="6" fill="#075985"></rect>
+        <text class="b2bW" x="480" y="270" text-anchor="middle">freshness check: on time, every night</text>
+
+        <rect x="14" y="292" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b2bN" x="38" y="304">The check reads the lower timeline. The data has been stale since night 1.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - a row-write timestamp measures the write, not the data.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Trap one: the full rebuild<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A table that is dropped and recreated every night, or written with a <code class="mono">create or replace</code>, has an <code class="mono">updated_at</code> that jumps to the current time on every load. That column now measures one thing: whether the job ran. If the source stopped producing events a week ago and the job faithfully rebuilds the same stale rows every night, the timestamp is perfect and the table is a week out of date.</p>
+        <p>The fix is to timestamp the <strong>source event</strong> rather than the row write, and to monitor the gap between the two. Most warehouse tables have a natural candidate already: an order time, a transaction time, an event time from the producing system.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select max(order_ts)                                    as newest_event,
+       max(updated_at)                                  as newest_write,
+       datediff('minute', max(order_ts), max(updated_at)) as event_to_write_min
+from analytics.orders_daily;
+        </div>
+        <p>On a healthy incremental table those two are minutes apart. On a full rebuild with a dead source, <code class="mono">newest_write</code> is now and <code class="mono">newest_event</code> is days ago, and the gap is the incident. Store the event-side value in the metrics table and monitor that one; keep the write-side value too, because the pair together tells you whether the problem is the source or the load.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>The reason this trap survives review is that it fails safe on the day you build it. You point the check at <code class="mono">max(updated_at)</code>, it returns a timestamp from twenty minutes ago, everything looks correct, and it stays correct until the first time the source dies without the pipeline dying with it. That is also the exact failure mode where nothing else alerts, because the pipeline succeeded.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Trap two: the empty partition<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>An empty load is still a load. In several warehouses a write of zero rows still updates the table's last-modified metadata, and in a partitioned table an empty partition can be created and registered with today's date. A freshness check reading table metadata therefore passes on a night when nothing arrived at all.</p>
+        <p>The defence is to make the freshness check assert on the data rather than on the container: count the rows in the window you expect, and treat zero as late rather than as fresh.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select count(*)                                as rows_today,
+       max(order_ts)                           as newest_event,
+       case when count(*) = 0 then 'no data, treat as late'
+            else 'has data'                    end as verdict
+from analytics.orders_daily
+where load_date = current_date;
+        </div>
+        <p>Note what this does to the shape of the monitor: the freshness condition becomes <em>rows exist</em> AND <em>the newest event is recent enough</em>, and the two clauses fail for different reasons. Report which one failed in the alert text, because "no rows at all" and "rows are three hours late" go to different people.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Freshness on a table you do not own<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Plenty of the tables you depend on are landed by somebody else: a vendor extract, another team's pipeline, a replicated source. You cannot add an event timestamp, you cannot change the load, and you frequently cannot get the promise written down. The only lever you actually hold is the comparison window.</p>
+        <ul>
+          <li><strong>Measure arrival, not content.</strong> If you cannot see inside the rows, record the moment the table first satisfies your own check each night and build the distribution out of that. A trailing p95 over your own observations is still a learned threshold, and it needs nothing from the owner.</li>
+          <li><strong>Widen the pad, not the percentile.</strong> On a table you do not control, more of the variance is genuinely outside anybody's management. A p95 with a generous pad pages rarely and still catches an order-of-magnitude miss, which is the class of failure you can actually escalate.</li>
+          <li><strong>Alert on your own consumers first.</strong> A page saying "the vendor extract is 4 hours late and the two dashboards that read it are showing yesterday" is actionable by you. A page saying "the vendor is late" is a ticket in somebody else's queue.</li>
+          <li><strong>Record the misses even when you cannot act.</strong> Thirty nights of measured lateness on a source you do not own is the single most useful artifact in the conversation where somebody asks for a service commitment from that source.</li>
+        </ul>
+        <div class="callout tip">
+          <p><strong>Do not put a hard gate on a source you cannot fix.</strong> Blocking your own downstream build when a vendor is late converts their lateness into your outage. Prefer a monitor plus a stale-data banner on the consumer, and keep the gate for sources whose owner is reachable.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>The learned freshness monitor</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Four queries against the metrics table, then two runs of the same monitor at two different settings. Use your own table if you have one recording; otherwise the numbers below are Bellwether's, and the arithmetic works out to the same place.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Step 1. Turn the load timestamp into lateness in minutes.</strong> The metrics table stores <code class="mono">max_updated_at</code>; the monitor needs the gap between that and the promise. Bellwether's promise is 06:00 on the load date, so the promise is a function of the row, not a constant.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select load_date,
+       max_updated_at,
+       datediff('minute',
+                load_date::timestamp + interval '6 hours',
+                max_updated_at) as late_minutes
+from analytics.obs_metrics
+where table_name = 'analytics.orders_daily'
+order by load_date;
+        </div>
+        <p>Session 1 already stored <code class="mono">late_minutes</code> directly, so this is a check rather than a computation. Run it anyway once: a mismatch here means the promise in your monitor and the promise in your metrics table disagree, and that is the kind of drift that makes a threshold quietly meaningless.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 2. Compute the trailing 14-night p95.</strong> A moving percentile is the one piece of arithmetic here that portable SQL makes awkward, because most warehouses accept <code class="mono">percentile_cont</code> as a window function but not with a moving frame. A self-join on the date range is portable, readable, and fast enough on a metrics table of a few thousand rows.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with m as (
+  select load_date, late_minutes
+  from analytics.obs_metrics
+  where table_name = 'analytics.orders_daily'
+),
+windowed as (
+  select m.load_date,
+         m.late_minutes,
+         h.late_minutes as hist_late
+  from m
+  join m as h
+    on h.load_date &lt; m.load_date
+   and h.load_date &gt;= m.load_date - 14
+)
+select load_date,
+       max(late_minutes)                                    as late_minutes,
+       count(*)                                             as nights_of_history,
+       percentile_disc(0.95) within group (order by hist_late) as p95_trailing
+from windowed
+group by load_date
+order by load_date;
+        </div>
+        <p>Use <code class="mono">percentile_disc</code> rather than <code class="mono">percentile_cont</code> if you want the threshold to be a minute value that actually occurred: <code class="mono">disc</code> picks a real observation by rank, <code class="mono">cont</code> interpolates between two. On the eight clean nights, 8, 14, 6, 19, 11, 22, 9 and 17, the rank-based p95 is <strong>22 minutes</strong>.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 3. Write the monitor as p95 plus a pad.</strong> Save step 2 as a view called <code class="mono">freshness_history</code> so the monitor reads three columns and nothing else. Two guards then matter as much as the comparison: refuse to fire before you have enough history, and state the threshold in the output so the alert text carries its own evidence.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select load_date,
+       late_minutes,
+       p95_trailing,
+       p95_trailing + 10 as threshold_min,
+       case when nights_of_history &lt; 7 then 'not enough history'
+            when late_minutes &gt; p95_trailing + 10 then 'FIRE'
+            else 'ok' end as monitor
+from freshness_history
+order by load_date;
+        </div>
+        <p>The message the monitor sends is part of the monitor. "landed 230 min late, trailing p95 is 22" carries the number, the comparison and the implied severity in eleven words, and it is the sentence the on-call needs before deciding whether to hold the dashboard.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 4. Run it against the eight clean nights.</strong> Threshold is 22 plus 10, so 32 minutes. The slowest clean night is 22. Nothing fires: <strong>zero false pages on eight nights</strong>. Compare that with the fixed 30-minute deadline, which also fires on nothing here, and note that the two are only equivalent for as long as the pipeline stays where it is today.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 5. Now run night 9.</strong> The table landed 230 minutes past the 06:00 promise. The trailing p95 is still 22, the threshold is still 32, and the monitor fires with <code class="mono">landed 230 min late, trailing p95 is 22</code>. Time the whole thing: from the check running to a human reading that sentence is the number that goes on the board, not the count of monitors you own.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 6. Break it on purpose: p75 and a 1-minute pad.</strong> Change two constants and rerun the same query over the same eight clean nights. The rank-based p75 of that set is <strong>17 minutes</strong>, so the threshold becomes 18. Night 4 at 19 minutes fires. Night 6 at 22 minutes fires. <strong>Two false pages out of eight clean nights</strong>, for exactly the same one catch on night 9.</p>
+        <p>That p75-plus-1 setting is not a straw man; it is the hair-trigger freshness setting on the capstone bench, and it is what the reflex "tighten the thresholds" produces after an incident. Run every monitor at that kind of setting together and the bench scores 2 of 5 caught with <strong>25 false pages</strong> in 30 nights, which is worse detection than having almost nothing switched on.</p>
+      </div>
+      <div class="step">
+        <p><strong>Step 7. Write down the evidence for the setting you kept.</strong> One line: the percentile, the window length, the pad, and the count of clean nights it would have paged on in your own history. That line is what makes the threshold reviewable in three months by somebody who was not there tonight.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>Sanity check before you ship it.</strong> Replay the monitor over the history you already have and count its pages. A threshold you cannot backtest is a threshold you are about to discover in production, and the backtest costs one query on a table with one row per night.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 3</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Plot 30 nights of lateness for your table and name the shape: cluster with a tail, bimodal, or drifting. If it is bimodal, find out which two things write the table. That answer is usually more valuable than the monitor.</li>
+      <li>Put the trailing p95 monitor into production on that one table with a pad you can defend, and backtest it over the history first. Record how many pages it would have sent.</li>
+      <li>Check the full-rebuild trap on every table you own: is <code class="mono">updated_at</code> a row-write time or a source-event time? Write the answer next to each table name. Most teams find at least one surprise.</li>
+      <li>Force an empty load on a non-critical table in a development schema and see whether your freshness check passes. Whatever it does, you now know rather than assume.</li>
+      <li>For one table you depend on but do not own, start recording arrival time nightly. Thirty rows of measured lateness is the whole argument in the conversation about a service commitment.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">The eight clean nights landed 8, 14, 6, 19, 11, 22, 9 and 17 minutes past the promise, and the monitor is a rank-based trailing p95 plus a 10-minute pad. What is the threshold, and what happens on those eight nights?</p>
+      <button class="qopt" type="button">A · 24 minutes, and the 22-minute night fires because it is inside the pad</button>
+      <button class="qopt" type="button">B · 19 minutes, because p95 of eight values is the second largest</button>
+      <button class="qopt" type="button">C · 32 minutes, and nothing fires, because the slowest clean night is 22</button>
+      <p class="qwhy">A rank-based p95 of that set is 22, the pad adds 10, and the threshold is 32. Every clean night is inside it, so the monitor costs zero false pages while still catching night 9 at 230 minutes by a factor of seven.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A table is dropped and rebuilt every night. The source stopped producing events eight days ago and the rebuild has run cleanly every night since. What does a freshness check on <code class="mono">max(updated_at)</code> report?</p>
+      <button class="qopt" type="button">A · On time every night, because the timestamp measures the row write rather than the data</button>
+      <button class="qopt" type="button">B · Late by eight days, because the newest real row is eight days old</button>
+      <button class="qopt" type="button">C · An error, because a rebuilt table has no stable updated_at column</button>
+      <p class="qwhy">The rebuild stamps every row with the current time, so the check confirms that the job ran and says nothing about whether the data is current. Timestamp the source event instead, and monitor the gap between the event time and the write time.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">The same monitor is retuned to a rank-based p75 with a 1-minute pad. On those eight clean nights, what does it cost and what does it buy?</p>
+      <button class="qopt" type="button">A · Nothing extra, and it catches night 9 several hours earlier</button>
+      <button class="qopt" type="button">B · Two false pages on eight clean nights, for exactly the same single catch</button>
+      <button class="qopt" type="button">C · One false page, and it now also catches the partial load on night 16</button>
+      <p class="qwhy">The rank-based p75 is 17, so the threshold is 18, and the 19-minute and 22-minute nights both page. Night 9 was already caught at the looser setting, so the tighter one buys nothing and spends two pages. Volume incidents are invisible to a freshness monitor at any setting.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Trailing percentiles as a learned freshness threshold</span>
+        <span class="note">Window length, percentile choice, the pad, and the backtest. Working portable SQL for the moving p95.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Source-event versus row-write timestamps</span>
+        <span class="note">The full-rebuild trap, the event-to-write gap query, and why the trap fails safe on the day you build it.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Empty-partition passes and freshness on tables you do not own</span>
+        <span class="note">Zero rows treated as late, the two-clause monitor, and the comparison window as the only lever on a source you cannot change.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Statistical detectors on a lateness series</span>
+        <span class="note">Percentiles, means and standard deviations compared here as thresholds. Seasonal decomposition, isolation forests and the rest belong to learn-anomaly-detection-with-phoebe.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Scoring a threshold against a full history</span>
+        <span class="note">Backtested here on eight nights by hand. Session 8 runs every monitor over 30 nights and prints catches, false pages and hours to detect together.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Service level objectives and on-call rotation design</span>
+        <span class="note">Not covered by design. The promise itself is taken as given here; negotiating it and running the rota around it is a delivery-practice topic.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 2 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>A fixed deadline</b><span>Encodes a guess that no clean night in your history exceeded, frozen on the day you guessed it.</span></div>
+      <div class="cheat-item"><b>The learned threshold</b><span>Trailing 14 nights, rank-based p95, plus a 10-minute pad. On this history: 22 plus 10, so 32.</span></div>
+      <div class="cheat-item"><b>Read the shape first</b><span>Cluster with a tail wants a percentile. Bimodal means two jobs write the table. Drifting means follow it.</span></div>
+      <div class="cheat-item"><b>Why not mean plus 3 sd</b><span>The incident in your history inflates the standard deviation that sets your threshold. A percentile barely moves.</span></div>
+      <div class="cheat-item"><b>Full-rebuild trap</b><span>updated_at jumps to now on every load. Timestamp the source event and monitor the event-to-write gap.</span></div>
+      <div class="cheat-item"><b>Empty-partition trap</b><span>Zero rows still touches table metadata. Make the check assert rows exist AND the newest event is recent.</span></div>
+      <div class="cheat-item"><b>Tables you do not own</b><span>The comparison window is the only lever. Record arrival nightly; that history is the whole argument later.</span></div>
+      <div class="cheat-item"><b>Hair-trigger cost</b><span>p75 plus 1 minute: 2 false pages on 8 clean nights for the same one catch. All seven tightened: 25 false pages.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 2 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b1-metadata-you-have.html">← Builder session 1 · The metadata you already have</a>
+      <a href="b3-volume-uniqueness.html">Builder session 3 · Volume and uniqueness →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

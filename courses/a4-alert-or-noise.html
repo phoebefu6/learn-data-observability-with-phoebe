@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Leader session 4 of 6. Every monitor buys detection with false pages. Two monitor sets with identical catches and identical detection time, eight false pages against zero, and the tightened set that catches 2 of 5 and detects nothing.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Alert or noise: the real cost of a threshold - learn data observability with phoebe">
+<meta property="og:description" content="Leader session 4 of 6. The three numbers to ask for, why one coverage number hides the trade, and how to audit an alert channel in an afternoon.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/a4-alert-or-noise.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Alert or noise: the real cost of a threshold - learn data observability with phoebe">
+<meta name="twitter:description" content="Caught, false pages, hours to detect. Three numbers, because one of them can be bought with a muted channel.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Leader session 4 · Alert or noise: the real cost of a threshold - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Leader session 4 of 6</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Leader session 4 of 6</div>
+    <h1>Alert or noise: the real cost of a <span class="accent">threshold</span></h1>
+    <p class="sub">Month one of a monitoring programme looks like a success. Monitors go on, alerts arrive, people answer them. Month two is where it dies, quietly, when the person carrying the pager stops opening the channel because most of what arrives there is nothing. Tonight is the exchange rate: what detection costs in false pages, why a coverage number can be bought with noise, and the three numbers to ask for instead of the one everybody offers.</p>
+    <div class="chip-row">
+      <span class="chip level">🟡 Core</span>
+      <span class="chip audience">Data and analytics leaders</span>
+      <span class="chip audience">Whoever owns the on-call rota</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-22 · What a false page costs</span>
+      <span class="a3" style="flex:4">22-40 · Build-along: audit your channel</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>What month two looks like</h2>
+    </div>
+    <p class="lede">A monitoring programme has two failure modes and only one of them is visible. The visible one is not enough coverage: something broke and nothing was watching. The invisible one is too much noise: everything was watching, everything fired, and the channel became wallpaper. The second failure looks identical to success on a status report, which is why it is the one that survives to month six. Tonight puts numbers against both, taken from the same 30 nights of Bellwether history that the builder track scores its monitor set against.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> The three numbers to ask for whenever somebody reports on monitoring, and the reason one of them alone is worthless. A measured pair of monitor sets with identical catches and identical detection time, where one spent eight false pages and the other spent none. And the number that settles the argument after an incident: seven monitors at tightened thresholds catch 2 of 5 and detect no faster than having almost nothing on.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why the second month is the one that decides it<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>In the first weeks, alerts are novel and somebody investigates every one. That is what makes the early data misleading: the response rate is high because attention is abundant, not because the monitors are good. By week five the same person has been woken for a weekend volume dip four times, has learned that this particular alert is never real, and has started to skim. Skimming is not laziness, it is a rational response to a channel with a low hit rate, and it is where detection quietly goes to zero while the dashboard still says every monitor is green and firing.</p>
+        <p>The consequence for anybody funding this is uncomfortable. The monitors that get switched off are rarely switched off; they get ignored, which is worse, because the line item stays in the budget and the reporting still counts them as coverage. A programme that would have been improved by deleting three monitors instead reports seven.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether ran a review after the finance incident and added six monitors in an afternoon, all at aggressive thresholds. Detection for the next real problem took 26 hours, exactly as long as before the review, because the person on call had stopped opening the channel by day nine. Nothing was misconfigured. Every monitor fired correctly. The channel had simply stopped being a place where anybody looked.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The four terms this session runs on<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>False page</strong> - an alert on a night when nothing was actually wrong. Not a bug. It is the currency you spend to buy detection, and the whole session is about the exchange rate.</li>
+          <li><strong>Caught before a stakeholder</strong> - an incident where a monitor told somebody on the team before somebody outside the team noticed. The only version of coverage that means anything, because it is the outcome you were buying.</li>
+          <li><strong>Mean hours to detect</strong> - average hours from the moment a table went wrong to the moment a human knew. It is the number that turns into money, since it multiplies by the number of decisions made on bad data in the interval.</li>
+          <li><strong>A muted channel</strong> - a destination that still receives every alert and that nobody reads. Indistinguishable from having no monitors, except that it costs money and appears on the report as coverage.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the exchange rate, alert fatigue and the muted channel</span>
+      <h2>The second month is where a monitoring programme dies</h2>
+      <span class="tag concept">10 min live</span>
+    </div>
+    <p class="lede">Every monitor buys detection with false pages. There is no threshold setting that avoids the trade, only settings that get a better rate for it, and the difference between a good rate and a poor one is usually not tooling. The chart below is one measured pair from Bellwether's history: two monitor sets, the same two incidents caught, the same detection time, and eight false pages against zero.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A paired bar chart comparing naive thresholds with learned thresholds on three measures. Both catch 2 of 5 incidents. Both take 15.8 mean hours to detect. The naive pair produces 8 false pages in 30 nights and the learned pair produces none.">
+        <style>
+          .a4aH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .a4aL { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .a4aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a4aV { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .a4aR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .a4aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <rect x="40" y="32" width="14" height="14" rx="3" fill="#38BDF8"></rect>
+        <text class="a4aL" x="62" y="44">Naive thresholds, set from a guess</text>
+        <rect x="320" y="32" width="14" height="14" rx="3" fill="#0369A1"></rect>
+        <text class="a4aL" x="342" y="44">Learned thresholds, set from history</text>
+
+        <line x1="40" y1="280" x2="840" y2="280" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <rect x="118" y="216" width="54" height="64" rx="4" fill="#38BDF8"></rect>
+        <text class="a4aV" x="145" y="208" text-anchor="middle">2 of 5</text>
+        <rect x="188" y="216" width="54" height="64" rx="4" fill="#0369A1"></rect>
+        <text class="a4aV" x="215" y="208" text-anchor="middle">2 of 5</text>
+        <text class="a4aH" x="180" y="300" text-anchor="middle">Incidents caught</text>
+        <text class="a4aM" x="180" y="318" text-anchor="middle">identical</text>
+
+        <rect x="378" y="183" width="54" height="97" rx="4" fill="#38BDF8"></rect>
+        <text class="a4aV" x="405" y="175" text-anchor="middle">15.8 h</text>
+        <rect x="448" y="183" width="54" height="97" rx="4" fill="#0369A1"></rect>
+        <text class="a4aV" x="475" y="175" text-anchor="middle">15.8 h</text>
+        <text class="a4aH" x="440" y="300" text-anchor="middle">Mean hours to detect</text>
+        <text class="a4aM" x="440" y="318" text-anchor="middle">identical</text>
+
+        <rect x="638" y="229" width="54" height="51" rx="4" fill="#38BDF8"></rect>
+        <text class="a4aR" x="665" y="221" text-anchor="middle">8</text>
+        <rect x="708" y="277" width="54" height="3" rx="1" fill="#0369A1"></rect>
+        <text class="a4aV" x="735" y="269" text-anchor="middle">0</text>
+        <text class="a4aH" x="700" y="300" text-anchor="middle">False pages, 30 nights</text>
+        <text class="a4aR" x="700" y="318" text-anchor="middle">the entire difference</text>
+
+        <rect x="40" y="336" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a4aN" x="64" y="348">Same catches, same hours. Eight pages bought nothing at all.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - identical results, and one set paid eight false pages for them.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The exchange rate, and why it is never zero<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A monitor sets a line and calls anything past it wrong. Real data wanders for reasons that are not incidents: a bank holiday, a marketing push, a genuinely slow but successful load. Move the line closer to normal and you catch more real problems and more of the wandering. Move it further out and you catch fewer of both. There is no line that catches every incident and nothing else, so the only question worth asking about a threshold is what rate it is getting you.</p>
+        <p>The good news in that chart is where the improvement comes from. Both sets watch the same two signals on the same table with the same query cost. One compares against a number somebody picked in a meeting, the other against the table's own recent history. That single change removes every false page while keeping both catches, and it needs no product, no headcount and no procurement cycle. When somebody proposes buying a tool to reduce alert noise, this is the question to ask first: are the current thresholds set from history or from a guess?</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Alert fatigue is a documented failure mode<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>This is not a data problem, and that is what makes it credible. Software operations has written about noisy paging for decades, and the fix in every published account is the same shape: fewer alerts, each one meaning something specific and actionable, routed to somebody who has agreed to answer it. Clinical alarm research reaches the same conclusion from a different direction, with monitoring equipment that alarms so often that staff response degrades. Different domains, same result, same remedy. The recommendation is never "add more alarms".</p>
+        <p>Where honesty is required is the number. There is no clean published threshold for how many false pages a specific team tolerates before it tips over, and anybody quoting one as a law is overstating it. It depends on how the page arrives, what hour it arrives at, how long triage takes and how much the reader trusts the sender. The <em>direction</em>, though, is not in doubt in any of that literature: response degrades as the proportion of false alerts rises, and it does not recover on its own.</p>
+        <div class="callout tip">
+          <p><strong>What to do with a well-evidenced direction and no exact number.</strong> Do not invent a threshold and present it as research. Measure your own instead. Count your false pages per week now, agree with the on-call rota what number would be intolerable, and treat that agreed number as the budget. It is a local number, it is defensible because it is yours, and it does what a published constant would have done anyway.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>A muted channel is worse than no monitors<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Consider two teams. The first has no monitoring on a table at all. The second has seven monitors on it firing into a channel that nobody has opened in three weeks. Both find out about incidents when a stakeholder complains, so their detection times are identical. On every practical measure they are the same team, with three differences, all in favour of the first:</p>
+        <ul>
+          <li><strong>The second team is paying.</strong> Compute, licence, and the hours that went into building and tuning seven monitors are all spent and still being spent.</li>
+          <li><strong>The second team believes it is covered.</strong> Nobody proposes fixing a problem they think is solved, so the muted channel is self-sustaining in a way that having nothing is not. An honest gap gets funded. An invisible one does not.</li>
+          <li><strong>The second team's next incident is harder to explain.</strong> "We were not watching that table" is a resourcing conversation. "It alerted correctly and nobody read it" is a trust conversation, and the trust conversation is much more expensive.</li>
+        </ul>
+        <p>Which is why deleting a monitor counts as progress rather than retreat. Every noisy monitor you remove raises the hit rate of the channel and therefore the response rate of everything left in it. The instinct to keep a monitor because it might catch something one day ignores what it costs the other monitors while it waits.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the three numbers and the tightening trap</span>
+      <h2>Reading a coverage number that was bought with noise</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">One number cannot describe a monitoring set, because any single number can be maximised by doing something stupid. Coverage alone rewards firing on everything. Precision alone rewards firing on nothing. So the habit worth building is to ask for three together, and to refuse the summary that offers one. The table below is computed against 30 nights of Bellwether load metadata with five real defects in it, and every row of it is arithmetic rather than assertion.</p>
+
+    <table class="clean">
+      <thead>
+        <tr><th>Monitors on</th><th>Caught</th><th>False pages</th><th>Mean hours to detect</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nothing</td><td>0 of 5</td><td>0</td><td>26.0</td></tr>
+        <tr><td>Freshness, fixed deadline</td><td>1 of 5</td><td>0</td><td>20.9</td></tr>
+        <tr><td>+ volume, fixed band</td><td>2 of 5</td><td>8</td><td>15.8</td></tr>
+        <tr><td>Learned freshness + same-weekday volume</td><td>2 of 5</td><td>0</td><td>15.8</td></tr>
+        <tr><td>+ uniqueness</td><td>3 of 5</td><td>0</td><td>10.7</td></tr>
+        <tr><td>+ schema diff</td><td>4 of 5</td><td>1</td><td>5.6</td></tr>
+        <tr><td>+ null rate, all five signals</td><td>5 of 5</td><td>2</td><td>0.5</td></tr>
+        <tr><td>All seven monitors, every threshold tightened</td><td>2 of 5</td><td>25</td><td>15.8</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip">
+      <p><strong>Read the last two rows together, because that pair is the session.</strong> Five signals at thresholds learned from history: 5 of 5 caught, 2 false pages, 0.5 hours to detect. The same seven monitors with every threshold tightened: 2 of 5 caught, 25 false pages, 15.8 hours. More monitoring, more alerts, more diligence, and a worse result on the two numbers anybody actually cares about.</p>
+    </div>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A chart that goes backwards. Catches fall from 5 of 5 with the learned five-signal set to 2 of 5 when all seven monitors are tightened. A chain to the right shows the mechanism: 25 false pages in 30 nights, six or more in a trailing week, a channel that stops being read, and three of five incidents found by a stakeholder at 26 hours. A note marks the muting rule as modelled rather than measured.">
+        <style>
+          .a4bH { font: 800 13px Inter, sans-serif; fill: #0C1B26; }
+          .a4bI { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .a4bB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .a4bL { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .a4bR { font: 800 12px Inter, sans-serif; fill: #991B1B; }
+          .a4bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="a4bAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+          <marker id="a4bRd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#991B1B"></path>
+          </marker>
+        </defs>
+
+        <text class="a4bR" x="150" y="66" text-anchor="middle">goes backwards</text>
+        <line x1="30" y1="250" x2="270" y2="250" stroke="#C3D4E0" stroke-width="1.5"></line>
+
+        <rect x="40" y="100" width="90" height="150" rx="5" fill="#075985"></rect>
+        <text class="a4bH" x="85" y="92" text-anchor="middle">5 of 5</text>
+        <text class="a4bL" x="85" y="268" text-anchor="middle">5 monitors,</text>
+        <text class="a4bL" x="85" y="284" text-anchor="middle">learned</text>
+        <text class="a4bB" x="85" y="302" text-anchor="middle">2 false · 0.5 h</text>
+
+        <rect x="170" y="190" width="90" height="60" rx="5" fill="#991B1B"></rect>
+        <text class="a4bH" x="215" y="182" text-anchor="middle">2 of 5</text>
+        <text class="a4bL" x="215" y="268" text-anchor="middle">7 monitors,</text>
+        <text class="a4bL" x="215" y="284" text-anchor="middle">tightened</text>
+        <text class="a4bB" x="215" y="302" text-anchor="middle">25 false · 15.8 h</text>
+
+        <path d="M132,104 C154,104 152,168 166,184" fill="none" stroke="#991B1B" stroke-width="1.8" marker-end="url(#a4bRd)"></path>
+
+        <rect x="310" y="70" width="250" height="48" rx="9" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="a4bI" x="326" y="92">25 false pages in 30 nights</text>
+        <text class="a4bB" x="326" y="110">every threshold at hair-trigger</text>
+
+        <rect x="310" y="138" width="250" height="48" rx="9" fill="#BAE6FD"></rect>
+        <text class="a4bI" x="326" y="160">6 or more in a trailing week</text>
+        <text class="a4bB" x="326" y="178">the modelled muting rule</text>
+
+        <rect x="310" y="206" width="250" height="48" rx="9" fill="#38BDF8"></rect>
+        <text class="a4bI" x="326" y="228">The channel stops being read</text>
+        <text class="a4bB" x="326" y="246">the page fires, nobody looks</text>
+
+        <rect x="310" y="274" width="250" height="48" rx="9" fill="#075985"></rect>
+        <text class="a4bH" x="326" y="296" fill="#fff">3 of 5 found by a stakeholder</text>
+        <text class="a4bB" x="326" y="314" fill="#BAE6FD">at 26.0 hours, as if unmonitored</text>
+
+        <line x1="435" y1="120" x2="435" y2="134" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a4bAr)"></line>
+        <line x1="435" y1="188" x2="435" y2="202" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a4bAr)"></line>
+        <line x1="435" y1="256" x2="435" y2="270" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#a4bAr)"></line>
+
+        <rect x="590" y="138" width="274" height="132" rx="10" fill="#F0F9FF" stroke="#B45309"></rect>
+        <text class="a4bI" x="606" y="162">Modelled, not measured</text>
+        <text class="a4bB" x="606" y="182">Six or more false pages in a trailing</text>
+        <text class="a4bB" x="606" y="200">week is treated as a muted channel.</text>
+        <text class="a4bB" x="606" y="218">The direction is documented in</text>
+        <text class="a4bB" x="606" y="236">operations and clinical alarm work.</text>
+        <text class="a4bB" x="606" y="254">The number six is a teaching choice.</text>
+
+        <rect x="40" y="352" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="a4bN" x="64" y="364">Catches fall from 5 of 5 to 2 of 5, detection from 0.5 h to 15.8 h.</text>
+        <text class="a4bB" x="64" y="384">Every page still fires. Three of them land where nobody is reading.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the only step on the ladder that goes backwards, and the mechanism behind it.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The three-number habit<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three numbers, reported together, every time. They are cheap to produce once the alert channel has been triaged for a quarter, and they are the only shape of report that cannot be gamed by doing something silly to one of them.</p>
+        <ul>
+          <li><strong>Incidents caught before a stakeholder noticed</strong>, as a count out of the total number of incidents. Out of the total, not as a percentage of monitors, and "before a stakeholder" is the load-bearing part of the phrase.</li>
+          <li><strong>False pages per week.</strong> A rate, not a total, so it stays comparable as the estate grows. This is the number a report will not volunteer, and it is the one to ask for first.</li>
+          <li><strong>Mean hours to detect.</strong> Hours from the data going wrong to a human knowing. It is the number that converts into business consequence, because the interval is exactly how long decisions were being made on bad data.</li>
+        </ul>
+        <div class="prompt-box bad">
+          <span class="label">✗ A number that hides the trade</span>
+Monitoring coverage now stands at 100 percent of tier 1 tables,
+up from 45 percent last quarter. Seven monitors deployed.
+        </div>
+        <div class="prompt-box good">
+          <span class="label">★ A number a decision can be made on</span>
+5 of 5 incidents caught before a stakeholder noticed, up from 2 of 5.
+2 false pages a month, down from 25 in a 30-night window.
+Mean detection 0.5 hours, down from 15.8.
+Two monitors were deleted to get here.
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The after-an-incident reflex, and what it buys<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The reflex is universal and well-intentioned. Something got missed, so every threshold gets tightened and a few new monitors go on, usually in the same afternoon as the review. It feels like the responsible response, and it reliably makes the system worse, because it spends the whole noise budget in one go and buys detection that lands in a channel that stops being read a week later.</p>
+        <p>The measured version is in the table: all seven monitors with every threshold tightened produce 25 false pages across 30 nights while catching 2 of 5. Every defect does fire a page, so the version of coverage most people mean is perfect. What collapses is the part that was never on the report, and detection ends up at 15.8 hours, which is the same as running two learned monitors and materially worse than running five.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>The better response to a missed incident is narrower and slower. Bellwether's night 19 was a duplicate failure with a normal row count, invisible to every monitor that was running. The fix was one new monitor on duplicate rate at a threshold read from the table's own history, and no change at all to the six existing thresholds. That single addition moved catches from 2 of 5 to 3 of 5 and detection from 15.8 hours to 10.7, and it cost zero false pages.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Deleting a monitor is progress, and how to say so<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Removal is the hardest thing to get agreed, because a deleted monitor sounds like reduced coverage and nobody wants to be the person who removed the check on the night before the incident. Three framings make it survivable in a governance meeting, and all three rest on the same fact: attention is the scarce resource, not compute.</p>
+        <ul>
+          <li><strong>A monitor that has never been right has no track record to defend.</strong> "This has fired 34 times in a quarter and been a real incident zero times" is not a controversial statement, it is a measurement. Bring the count.</li>
+          <li><strong>Deletion is not the only option, and retuning is the usual answer.</strong> Most noisy monitors are noisy because the threshold came from a guess rather than from history, which means the same monitor at a learned threshold keeps the catches and drops the noise. Offer both and let the room pick.</li>
+          <li><strong>Name what the noise is costing the rest.</strong> A monitor firing four times a week is not costing you compute, it is costing the response rate of every other monitor in the same channel. That is the sentence that changes the decision, because it reframes deletion as protecting coverage rather than reducing it.</li>
+        </ul>
+        <p>One useful practice to adopt alongside it: a review of the alert channel on a fixed cadence, quarterly is enough, with the specific brief of removing or retuning the noisiest monitor. Not adding. A programme with no removal mechanism only ever accumulates, and accumulation is precisely how a channel becomes wallpaper.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Audit your channel</h2>
+      <span class="tag demo">★ 18 min · everyone builds</span>
+    </div>
+    <p class="lede">This is an afternoon of work at most, and it produces the baseline you will be reporting against for the rest of the year. It needs no tooling and no access you do not already have: the alert channel, whoever is on the rota, and a willingness to count things that nobody has counted before.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Pull the last 90 days of the alert channel.</strong> Whatever it is: a chat channel, a mailbox, a paging tool's history. Ninety days rather than a week, because a week is short enough to be an unusually quiet or unusually awful one and you will be quoting this number for months.</p>
+      </div>
+      <div class="step">
+        <p><strong>Count three things: alerts, real incidents, and alerts nobody replied to.</strong> The third count is the one people skip and it is the most informative, because a long run of unanswered alerts is the signature of a muted channel with a date on it. Note the date where the replies stop; that is the day your detection quietly reverted to stakeholder discovery.</p>
+      </div>
+      <div class="step">
+        <p><strong>Compute false pages per week.</strong> Total alerts minus real incidents, divided by roughly thirteen weeks. Say the number out loud in the room. If it is above one a week, you have found the constraint on your entire programme, and no additional monitor will improve detection until it comes down.</p>
+      </div>
+      <div class="step">
+        <p><strong>Find the noisiest single monitor and decide, tonight, retune or delete.</strong> In most estates one or two monitors produce the majority of the noise, and they are usually fixed-band checks on something seasonal. Retune means setting the threshold from that table's own trailing history. Delete means delete. Both are decisions; leaving it to be looked at later is not.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the three numbers down as your baseline, with today's date.</strong> Caught before a stakeholder, false pages per week, mean hours to detect. Approximate is fine and honestly labelled approximate is better. Without a dated baseline, every improvement you make for the next year is unprovable, and unprovable improvements do not get funded twice.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>Expect the first audit to be embarrassing, and say so before you start.</strong> Almost every team discovers that the caught-before-a-stakeholder count is lower than anyone would have guessed and that a large share of alerts were never triaged. That is the finding, not a failure of the audit, and a leader who frames it as a baseline rather than a verdict gets a team that helps count. A leader who frames it as an assessment gets a channel that mysteriously looks tidy by Friday.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 5</h2>
+      <span class="tag exercise">25 min</span>
+    </div>
+    <ol>
+      <li>Agree a false-page budget with whoever carries the rota. One number, per week, that you both accept as the ceiling. It is a local number rather than a published one, and that is exactly what makes it usable.</li>
+      <li>Retune or delete the noisiest monitor you found, and record the before and after count. This is the smallest possible piece of evidence that the practice works, and it is worth having before session 6 asks you to report on progress.</li>
+      <li>List every table currently carrying a monitor, and mark which ones a decision actually depends on. Session 5 is about coverage without headcount, and it starts from the observation that most estates are monitoring the wrong twenty percent.</li>
+      <li>Ask the person on call one question and write down the answer verbatim: what do you do when a page arrives at 07:00? If the answer describes checking whether it is real before acting, your channel already has a trust problem and now you have it in their words.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Two monitor sets both catch 2 of 5 incidents with a mean detection time of 15.8 hours. What separates them?</p>
+      <button class="qopt" type="button">A · The learned set runs more often, so it reaches the on-call sooner</button>
+      <button class="qopt" type="button">B · The naive set spends 8 false pages to buy exactly the same two catches, and the learned set spends none</button>
+      <button class="qopt" type="button">C · They catch different incidents, so the two sets are not comparable</button>
+      <p class="qwhy">Identical catches, identical hours, 8 false pages against 0. The whole difference is that one pair of thresholds came from a guess and the other from the table's own trailing history, which costs nothing to change.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">All seven monitors are tightened after an incident. Every defect now fires a page, yet catches fall to 2 of 5 and detection goes to 15.8 hours. Why?</p>
+      <button class="qopt" type="button">A · 25 false pages across 30 nights leave the channel unread, so three incidents are found by a stakeholder anyway</button>
+      <button class="qopt" type="button">B · Tighter thresholds need more history before they can fire, so they detect later</button>
+      <button class="qopt" type="button">C · The extra queries slow the warehouse, which delays every alert</button>
+      <p class="qwhy">A page nobody reads is not a detection. The exchange rate went bad enough that the channel stopped being a place anybody looked, which is the documented failure mode of noisy alerting rather than anything exotic.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Team A has no monitors on a table. Team B has seven firing into a channel nobody has opened for three weeks. How do they compare?</p>
+      <button class="qopt" type="button">A · Team B is better off, because the alert history can be reviewed later</button>
+      <button class="qopt" type="button">B · Team B detects faster, since the alerts do fire correctly</button>
+      <button class="qopt" type="button">C · Detection is the same for both, and team B is worse off because it is paying for it and believes it is covered</button>
+      <p class="qwhy">Both find out when a stakeholder complains. An honest gap gets funded; an invisible one does not, and "it alerted and nobody read it" is a much more expensive conversation than "we were not watching that table".</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">False-page cost as the constraint on monitoring design</span>
+        <span class="note">The exchange rate stated plainly, with a measured pair: identical catches and detection, 8 false pages against 0.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Alert fatigue as a documented failure mode</span>
+        <span class="note">Documented in software operations and in clinical alarm research, where the remedy is always fewer and better alerts. No published tipping point is claimed for a specific team, because none exists; the direction is not in doubt.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Reading a coverage number bought with a muted channel</span>
+        <span class="note">The three reportable numbers, and the tightened set that catches 2 of 5 with 25 false pages and 15.8 hours against 5 of 5, 2 and 0.5.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">The muting rule behind those numbers</span>
+        <span class="note">Six or more false pages in a trailing seven nights is treated as a muted channel on the session 8 bench, which costs the full stakeholder discovery time. That threshold is modelled and labelled as modelled, on the bench and here.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Setting the thresholds themselves</span>
+        <span class="note">Trailing percentiles, same-weekday medians and robust bands are arithmetic the builder track carries in sessions 2 and 3. Tonight is what a threshold costs, not how to compute one.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Error budgets and service level objectives</span>
+        <span class="note">The exchange-rate framing is borrowed from service reliability practice. The full apparatus of data SLOs and on-call design belongs to its own course in this bucket.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Severity weighting across incidents</span>
+        <span class="note">Not covered by design. Every one of the five defects counts the same in these numbers, which is not true of a real estate and is the first refinement worth adding to your own version.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 4 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Ask for three numbers</b><span>Caught before a stakeholder, false pages per week, mean hours to detect. One number hides the trade.</span></div>
+      <div class="cheat-item"><b>The exchange rate</b><span>Detection is always bought with false pages. The only question is what rate you are getting.</span></div>
+      <div class="cheat-item"><b>Learned beats naive</b><span>Same 2 of 5 caught, same 15.8 hours, 8 false pages against 0. No tooling, just the right history.</span></div>
+      <div class="cheat-item"><b>Tightening backfires</b><span>7 monitors at hair-trigger: 2 of 5 caught, 25 false pages, detection back to 15.8 hours.</span></div>
+      <div class="cheat-item"><b>The best rung</b><span>Five signals at learned thresholds: 5 of 5 caught, 2 false pages, 0.5 hours to detect.</span></div>
+      <div class="cheat-item"><b>A muted channel</b><span>Same detection as no monitors, but you are paying for it and you think you are covered.</span></div>
+      <div class="cheat-item"><b>Deleting is progress</b><span>Noise costs the response rate of every other monitor sharing the channel.</span></div>
+      <div class="cheat-item"><b>No published tipping point</b><span>Measure your own false-page rate and agree a local budget. The direction is well documented; the number is yours.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Leader session 4 of 6 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="a3-quality-dimensions.html">← Leader session 3 · Quality dimensions</a>
+      <a href="a5-coverage-without-headcount.html">Leader session 5 · Coverage without headcount →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

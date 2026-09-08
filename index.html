@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Fourteen sessions on keeping data trustworthy: the five signals, thresholds learned from a table's own history, and a bench that scores your monitor set over 30 nights of real metadata. Free, by Phoebe Fu.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Learn Data Observability with Phoebe">
+<meta property="og:description" content="Five of five defects caught with two false pages. Tighten every threshold and it drops to two of five with twenty-five.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Learn Data Observability with Phoebe">
+<meta name="twitter:description" content="Five of five defects caught with two false pages. Tighten every threshold and it drops to two of five with twenty-five.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Learn Data Observability with Phoebe</title>
+<link rel="stylesheet" href="assets/style.css?v=1">
+<style>
+
+  .stats-row { display: flex; gap: 2.4rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .stat b { display: block; font-size: 2.1rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .72rem; opacity: .85; text-transform: uppercase; letter-spacing: .09em; font-weight: 600; }
+
+  .course-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .course-card {
+    border: 1px solid var(--hairline);
+    border-top: 4px solid var(--diff, var(--indigo));
+    border-radius: var(--radius);
+    padding: 1.2rem 1.3rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    text-decoration: none;
+    color: var(--ink);
+    background: #fff;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+    position: relative;
+  }
+  .course-card:hover { border-color: var(--indigo-soft); border-top-color: var(--diff, var(--indigo)); box-shadow: 0 8px 28px rgba(3,105,161,.16); transform: translateY(-3px); }
+  .course-card .cicon { font-size: 1.7rem; line-height: 1; }
+  .course-card .cnum { font-size: .72rem; font-weight: 700; color: var(--indigo); text-transform: uppercase; letter-spacing: .1em; }
+  .course-card h3 { font-size: 1.05rem; font-weight: 800; line-height: 1.3; }
+  .course-card p { font-size: .85rem; color: var(--muted); flex: 1; }
+  .course-card .meta { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+  .diff-legend { display: flex; gap: 1rem; margin-top: 1.6rem; font-size: .74rem; color: var(--muted); font-weight: 600; flex-wrap: wrap; }
+  .diff-legend i { display: inline-block; width: .85rem; height: .35rem; border-radius: 999px; margin-right: .35rem; vertical-align: middle; }
+
+  .paths { margin-top: 2.6rem; }
+  .paths h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .3rem; }
+  .paths .plede { color: var(--muted); font-size: .92rem; margin-bottom: .8rem; }
+  .path { display: flex; gap: .55rem; align-items: center; padding: .75rem 0; border-bottom: .5px solid var(--hairline); flex-wrap: wrap; }
+  .path:last-child { border-bottom: none; }
+  .path b { min-width: 15.5rem; font-size: .9rem; }
+  .path .pstep { background: var(--indigo-50); color: var(--indigo); border-radius: 999px; padding: .16rem .68rem; font-weight: 700; font-size: .8rem; text-decoration: none; transition: all .12s ease; }
+  .path .pstep:hover { background: var(--indigo); color: #fff; }
+  .path .parr { color: var(--faint); font-weight: 700; }
+
+  .mm-section { margin-top: 1.6rem; }
+  .mm-section h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .2rem; }
+  .mm-section .mm-lede { color: var(--muted); font-size: .92rem; margin-bottom: .4rem; }
+  .mm-wrap { border: 1px solid var(--hairline); border-radius: var(--radius); background: linear-gradient(180deg,#fff,#F0F9FF); padding: .6rem; overflow-x: auto; }
+  .mm-svg { width: 100%; height: auto; display: block; max-width: 60rem; margin: 0 auto; min-width: 34rem; }
+  .mm-link { cursor: pointer; text-decoration: none; }
+  .mm-node rect { transition: opacity .15s ease, filter .15s ease; }
+  .mm-node text { pointer-events: none; }
+  .mm-link:hover .mm-node rect { filter: brightness(1.06); }
+  .mm-edge { transition: opacity .15s ease; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn with Phoebe · Data Ops &amp; Security</div>
+    <h1>Learn <span class="accent">Data Observability</span> with Phoebe</h1>
+    <p class="sub">Pipelines that never fail still ship wrong numbers. A shard stops arriving and the row count is at 41 percent of a normal day's rows for two business days; a merge key changes and the duplicate rate triples while the count looks perfect; a column disappears and two dashboards quietly lose a filter. None of that raises an error, so the person who finds it is a stakeholder. This course builds the layer that finds it first: four cheap metadata queries, thresholds learned from a table's own history rather than guessed, and a bench that scores your monitor set over 30 nights of real load metadata with five real defects in it. Six leader sessions on what to fund and what to report; eight builder sessions that end with a monitor set you have actually measured.</p>
+    <div class="stats-row">
+      <div class="stat"><b data-count="14">14</b><span>sessions, two tracks</span></div>
+      <div class="stat"><b data-count="5">5</b><span>signals, four of them free</span></div>
+      <div class="stat"><b data-count="30">30</b><span>nights of metadata on the bench</span></div>
+      <div class="stat"><b data-count="25">25</b><span>false pages from tightening everything</span></div>
+      <div class="stat"><b data-count="45">45</b><span>min per session</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Leader track 🌙 <span style="font-size:.85rem;font-weight:600;color:var(--muted)">· six sessions, no SQL</span></h2>
+      <p class="plede">For whoever funds the work and reads the report. What data downtime costs, which signals are worth paying for, and the three numbers that say whether the programme is working.</p>
+    </div>
+
+    <div class="course-grid">
+      <a class="course-card" href="courses/a1-what-breaks.html" style="--diff:#34D399">
+        <span class="cicon">🌙</span>
+        <span class="cnum">Leader session 1 · start here</span>
+        <h3>What breaks, and who finds out first</h3>
+        <p>Data downtime as a number rather than a feeling: what a wrong table costs while people use it, and the discovery gap between the team that owns it and the stakeholder who reports it.</p>
+        <span class="meta"><span class="pill amber">▶ Start here</span></span>
+      </a>
+      <a class="course-card" href="courses/a2-five-signals.html" style="--diff:#34D399">
+        <span class="cicon">📡</span>
+        <span class="cnum">Leader session 2</span>
+        <h3>Five signals, five ways to find out first</h3>
+        <p>Freshness, volume, schema, distribution and lineage: what each one sees, what each one is blind to, and which four cost nothing but a query.</p>
+      </a>
+      <a class="course-card" href="courses/a3-quality-dimensions.html" style="--diff:#FBBF24">
+        <span class="cicon">📏</span>
+        <span class="cnum">Leader session 3</span>
+        <h3>Quality is a dimension with a number</h3>
+        <p>DAMA-DMBOK's six dimensions against ISO/IEC 25012's fifteen, and how to pick the three your business actually pays for rather than measuring all of them badly.</p>
+      </a>
+      <a class="course-card" href="courses/a4-alert-or-noise.html" style="--diff:#FBBF24">
+        <span class="cicon">🔔</span>
+        <span class="cnum">Leader session 4</span>
+        <h3>Alert or noise: the real cost of a threshold</h3>
+        <p>Why the second month of a monitoring programme is where it dies, what a false page costs, and how to read a coverage number that was bought with a muted channel.</p>
+      </a>
+      <a class="course-card" href="courses/a5-coverage-without-headcount.html" style="--diff:#FB923C">
+        <span class="cicon">🪜</span>
+        <span class="cnum">Leader session 5</span>
+        <h3>Coverage without headcount</h3>
+        <p>Tiering tables so the 20 percent that carries the business gets watched properly and the long tail gets watched cheaply. The decision that keeps this affordable.</p>
+      </a>
+      <a class="course-card" href="courses/a6-trust-score.html" style="--diff:#FB923C">
+        <span class="cicon">📈</span>
+        <span class="cnum">Leader session 6</span>
+        <h3>From firefighting to a trust score</h3>
+        <p>The 90-day plan and the three numbers to report: incidents caught before a stakeholder, mean hours to detect, and false pages per week.</p>
+        <span class="meta"><span class="pill amber">the board version</span></span>
+      </a>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Builder track 🔧 <span style="font-size:.85rem;font-weight:600;color:var(--muted)">· eight sessions, one monitor set</span></h2>
+      <p class="plede">One table, orders_daily at Bellwether, instrumented signal by signal. Session 8 runs the finished set against 30 nights of history and counts what it caught.</p>
+    </div>
+
+    <div class="course-grid">
+      <a class="course-card" href="courses/b1-metadata-you-have.html" style="--diff:#34D399">
+        <span class="cicon">🔎</span>
+        <span class="cnum">Builder session 1 · start here</span>
+        <h3>The metadata you already have</h3>
+        <p>Four numbers every warehouse already stores, the SQL that pulls them, and the anatomy of a monitor that somebody actually answers at 07:00.</p>
+        <span class="meta"><span class="pill amber">▶ Start here</span></span>
+      </a>
+      <a class="course-card" href="courses/b2-freshness.html" style="--diff:#FBBF24">
+        <span class="cicon">⏱️</span>
+        <span class="cnum">Builder session 2</span>
+        <h3>Freshness: on-time is a distribution</h3>
+        <p>Why a fixed deadline is the wrong shape for the question, trailing percentiles that learn the table's real habits, and the full-rebuild trap.</p>
+      </a>
+      <a class="course-card" href="courses/b3-volume-uniqueness.html" style="--diff:#FBBF24">
+        <span class="cicon">🧮</span>
+        <span class="cnum">Builder session 3</span>
+        <h3>Volume and uniqueness</h3>
+        <p>Same-weekday medians against seasonality, robust bands with MAD, and the duplicate rate that catches what a healthy row count hides.</p>
+      </a>
+      <a class="course-card" href="courses/b4-schema-change.html" style="--diff:#FBBF24">
+        <span class="cicon">🧬</span>
+        <span class="cnum">Builder session 4</span>
+        <h3>Schema change: the break you can see coming</h3>
+        <p>Column-set diffs, type widening, the difference between an additive change and a contract break, and why the revert pages too.</p>
+      </a>
+      <a class="course-card" href="courses/b5-distribution-drift.html" style="--diff:#FB923C">
+        <span class="cicon">📊</span>
+        <span class="cnum">Builder session 5</span>
+        <h3>Distribution drift from metadata only</h3>
+        <p>Null rates, cardinality, min and max, segment share. How far you get without reading a row, and the point where this becomes a different discipline.</p>
+      </a>
+      <a class="course-card" href="courses/b6-expectations-as-code.html" style="--diff:#FB923C">
+        <span class="cicon">✅</span>
+        <span class="cnum">Builder session 6</span>
+        <h3>Expectations as code</h3>
+        <p>Great Expectations Core end to end: Data Context, Batch Definition, Suite, Validation Definition, Checkpoint and Actions, wired to the metrics table.</p>
+      </a>
+      <a class="course-card" href="courses/b7-lineage-blast-radius.html" style="--diff:#F87171">
+        <span class="cicon">🕸️</span>
+        <span class="cnum">Builder session 7</span>
+        <h3>Lineage and blast radius</h3>
+        <p>Column-level lineage with OpenLineage, the impact query that turns an alert into a triage decision, and the reverse-ETL job nobody documented.</p>
+      </a>
+      <a class="course-card" href="courses/b8-monitor-bench.html" style="--diff:#F87171">
+        <span class="cicon">🎛️</span>
+        <span class="cnum">Builder session 8</span>
+        <h3>The monitor bench</h3>
+        <p>Thirty nights, five real defects, seven monitors, three numbers. Hair-trigger everything and detection falls back to where it started.</p>
+        <span class="meta"><span class="pill amber">🔒 the capstone</span></span>
+      </a>
+    </div>
+
+    <div class="diff-legend">
+      <span><i style="background:#34D399"></i>start here</span>
+      <span><i style="background:#FBBF24"></i>foundations</span>
+      <span><i style="background:#FB923C"></i>hands-on</span>
+      <span><i style="background:#F87171"></i>advanced and capstone</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths">
+      <h2>Choose your path 🗺️</h2>
+      <p class="plede">Three doors into the same practice. Both tracks start at their own session 1, because the vocabulary is what makes the rest arguable.</p>
+      <div class="path"><b>💼 I fund this and read the report</b>
+        <a class="pstep" href="courses/a1-what-breaks.html">L1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a4-alert-or-noise.html">L4</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a5-coverage-without-headcount.html">L5</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a6-trust-score.html">L6</a>
+        <span style="font-size:.82rem;color:var(--muted)">the cost, the noise problem, tiering, and the three numbers to report</span>
+      </div>
+      <div class="path"><b>🔧 I own the table</b>
+        <a class="pstep" href="courses/b1-metadata-you-have.html">B1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b2-freshness.html">B2</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b3-volume-uniqueness.html">B3</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b4-schema-change.html">B4</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b8-monitor-bench.html">B8</a>
+        <span style="font-size:.82rem;color:var(--muted)">the four numbers, three learned thresholds, then score the set</span>
+      </div>
+      <div class="path"><b>🎯 Everything, in order</b>
+        <a class="pstep" href="courses/a1-what-breaks.html">L1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a2-five-signals.html">L2</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/a3-quality-dimensions.html">L3</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b1-metadata-you-have.html">B1</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b5-distribution-drift.html">B5</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b6-expectations-as-code.html">B6</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b7-lineage-blast-radius.html">B7</a>
+        <span class="parr">→</span>
+        <a class="pstep" href="courses/b8-monitor-bench.html">B8</a>
+        <span style="font-size:.82rem;color:var(--muted)">from a table nobody watches to a set that catches five of five with two false pages</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>Your passport 🎫</h2>
+      <p class="plede">Clear all three quiz questions in a session and it gets stamped. Fourteen stamps across both tracks, and they live in this browser only.</p>
+    </div>
+    <div class="pp-strip"></div>
+  </section>
+
+  <section class="section">
+    <div class="paths" style="margin-top:0">
+      <h2>What is real here 🧾</h2>
+      <p class="plede">A course about detecting quiet failures should be exact about which of its own numbers are measured.</p>
+    </div>
+    <table class="clean">
+      <tr><th>Claim</th><th>Status</th></tr>
+      <tr><td>The 30 nights of load metadata</td><td>Generated once from a fixed seed and identical for every learner. Row counts, load lateness, duplicate rates, null rates and column sets, with a real weekday and weekend pattern</td></tr>
+      <tr><td>The five defects</td><td>Injected into specific nights: a 230-minute late load, a load holding 41 percent of a normal count, a duplicate rate of 8.4 percent, a dropped column, and a null rate of 11.4 percent. On a defect night every other signal is held at a quiet baseline, so credit for a catch can only go to the monitor watching that pillar</td></tr>
+      <tr><td>The ladder: 0, 1, 2, 2, 3, 4, 5 of 5 caught</td><td>Computed by the bench in your browser, night by night. Trailing percentiles, same-weekday medians, duplicate rates, column-set diffs and standard deviations are all real arithmetic on that history</td></tr>
+      <tr><td>Eight false pages from a fixed volume band</td><td>Arithmetic. Weekend volume is about 45 percent of a weekday, which sits outside a plus-or-minus 30 percent band on all eight weekend nights in the window</td></tr>
+      <tr><td>Tightening everything: 2 of 5, 25 false pages, 15.8 hours</td><td>The counts and the thresholds are real. The consequence runs through one modelled rule, below</td></tr>
+      <tr><td>The muted channel</td><td>Modelled, not measured. Six or more false pages in a trailing week is treated as a channel nobody reads, so the page fires and the stakeholder still finds the problem first. Labelled as a model on the widget itself</td></tr>
+      <tr><td>Great Expectations component names</td><td>Read from the GX Core 1.x documentation: Data Context, Data Source, Data Asset, Batch Definition, Expectation, Expectation Suite, Validation Definition, Checkpoint, Actions, Data Docs</td></tr>
+      <tr><td>DAMA-DMBOK's six dimensions and ISO/IEC 25012</td><td>Both named as published, including the point that uniqueness appears in DAMA and not in the ISO inherent set. The ISO standard itself is paywalled, so wording travels through close secondary sources and is flagged where it does</td></tr>
+      <tr><td>Bellwether</td><td>A fictional grocery delivery company. The failure patterns are ordinary ones; the company is not real</td></tr>
+    </table>
+  </section>
+
+  <section class="section mm-section">
+    <h2>The knowledge map 🧠</h2>
+    <p class="mm-lede">Both tracks at a glance - hover a session to spotlight its concepts, click any node to jump in.</p>
+    <div class="mm-wrap"><div id="mindmap"></div></div>
+  </section>
+
+  <footer class="pagefoot">
+    <span>learn-data-observability-with-phoebe · by Phoebe Fu &nbsp;·&nbsp; 📚 <a href="https://phoebefu6.github.io/learn-with-phoebe/">Learn with Phoebe ↗</a></span>
+    <span>Pairs with <a href="https://phoebefu6.github.io/learn-dataops-with-phoebe/">DataOps ↗</a> and <a href="https://phoebefu6.github.io/learn-analytics-engineering-with-phoebe/">Analytics Engineering ↗</a> · source map: <span class="mono">materials/official-course-map.md</span></span>
+  </footer>
+
+</main>
+
+<script>
+window.MINDMAP_DATA = {
+  "title": "Data\nObservability",
+  "centerColor": "#075985",
+  "sessions": [
+    {
+      "label": "What breaks",
+      "href": "courses/a1-what-breaks.html",
+      "concepts": [
+        {
+          "label": "Data downtime",
+          "href": "courses/a1-what-breaks.html"
+        },
+        {
+          "label": "The discovery gap",
+          "href": "courses/a1-what-breaks.html"
+        },
+        {
+          "label": "Cost of a wrong table",
+          "href": "courses/a1-what-breaks.html"
+        }
+      ]
+    },
+    {
+      "label": "Five signals",
+      "href": "courses/a2-five-signals.html",
+      "concepts": [
+        {
+          "label": "Freshness",
+          "href": "courses/b2-freshness.html"
+        },
+        {
+          "label": "Volume",
+          "href": "courses/b3-volume-uniqueness.html"
+        },
+        {
+          "label": "Schema",
+          "href": "courses/b4-schema-change.html"
+        },
+        {
+          "label": "Distribution",
+          "href": "courses/b5-distribution-drift.html"
+        },
+        {
+          "label": "Lineage",
+          "href": "courses/b7-lineage-blast-radius.html"
+        }
+      ]
+    },
+    {
+      "label": "Quality dimensions",
+      "href": "courses/a3-quality-dimensions.html",
+      "concepts": [
+        {
+          "label": "DAMA six",
+          "href": "courses/a3-quality-dimensions.html"
+        },
+        {
+          "label": "ISO 25012",
+          "href": "courses/a3-quality-dimensions.html"
+        },
+        {
+          "label": "Pick three",
+          "href": "courses/a3-quality-dimensions.html"
+        }
+      ]
+    },
+    {
+      "label": "Alert or noise",
+      "href": "courses/a4-alert-or-noise.html",
+      "concepts": [
+        {
+          "label": "False pages",
+          "href": "courses/a4-alert-or-noise.html"
+        },
+        {
+          "label": "Alert fatigue",
+          "href": "courses/a4-alert-or-noise.html"
+        },
+        {
+          "label": "Named human",
+          "href": "courses/b1-metadata-you-have.html"
+        }
+      ]
+    },
+    {
+      "label": "Tiering tables",
+      "href": "courses/a5-coverage-without-headcount.html",
+      "concepts": [
+        {
+          "label": "The critical 20",
+          "href": "courses/a5-coverage-without-headcount.html"
+        },
+        {
+          "label": "Cheap long tail",
+          "href": "courses/a5-coverage-without-headcount.html"
+        }
+      ]
+    },
+    {
+      "label": "Trust score",
+      "href": "courses/a6-trust-score.html",
+      "concepts": [
+        {
+          "label": "MTTD",
+          "href": "courses/b8-monitor-bench.html"
+        },
+        {
+          "label": "Caught first",
+          "href": "courses/b8-monitor-bench.html"
+        },
+        {
+          "label": "90-day plan",
+          "href": "courses/a6-trust-score.html"
+        }
+      ]
+    },
+    {
+      "label": "Metadata you have",
+      "href": "courses/b1-metadata-you-have.html",
+      "concepts": [
+        {
+          "label": "max(updated_at)",
+          "href": "courses/b1-metadata-you-have.html"
+        },
+        {
+          "label": "The metrics table",
+          "href": "courses/b1-metadata-you-have.html"
+        },
+        {
+          "label": "Anatomy of a monitor",
+          "href": "courses/b1-metadata-you-have.html"
+        }
+      ]
+    },
+    {
+      "label": "Learned thresholds",
+      "href": "courses/b2-freshness.html",
+      "concepts": [
+        {
+          "label": "Trailing p95",
+          "href": "courses/b2-freshness.html"
+        },
+        {
+          "label": "Same-weekday median",
+          "href": "courses/b3-volume-uniqueness.html"
+        },
+        {
+          "label": "Duplicate rate",
+          "href": "courses/b3-volume-uniqueness.html"
+        },
+        {
+          "label": "Full-rebuild trap",
+          "href": "courses/b2-freshness.html"
+        }
+      ]
+    },
+    {
+      "label": "Expectations as code",
+      "href": "courses/b6-expectations-as-code.html",
+      "concepts": [
+        {
+          "label": "Checkpoint",
+          "href": "courses/b6-expectations-as-code.html"
+        },
+        {
+          "label": "Validation Definition",
+          "href": "courses/b6-expectations-as-code.html"
+        },
+        {
+          "label": "Actions",
+          "href": "courses/b6-expectations-as-code.html"
+        }
+      ]
+    },
+    {
+      "label": "The bench",
+      "href": "courses/b8-monitor-bench.html",
+      "concepts": [
+        {
+          "label": "5 of 5 caught",
+          "href": "courses/b8-monitor-bench.html"
+        },
+        {
+          "label": "25 false pages",
+          "href": "courses/b8-monitor-bench.html"
+        },
+        {
+          "label": "Tightening backfires",
+          "href": "courses/b8-monitor-bench.html"
+        }
+      ]
+    }
+  ]
+};
+</script>
+<script src="assets/app.js?v=1"></script>
+<script src="assets/mindmap.js?v=1"></script>
+</body>
+</html>

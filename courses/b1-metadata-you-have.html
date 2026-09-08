@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 1 of 8. The four numbers every warehouse already stores about every table, the query that turns each one into a signal, and the anatomy of a monitor that somebody will actually answer.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="The metadata you already have - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 1 of 8. Row counts, max(updated_at), distinct keys and null counts are already sitting in your warehouse. Tonight they become monitors.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b1-metadata-you-have.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The metadata you already have - learn data observability with phoebe">
+<meta name="twitter:description" content="Four numbers, five signals, and the anatomy of a monitor somebody answers.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 1 · The metadata you already have - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 1 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 1 of 8</div>
+    <h1>The metadata you <span class="accent">already have</span></h1>
+    <p class="sub">Nobody buys an observability tool on night one. Every warehouse already stores four numbers about every table it holds, and those four numbers carry most of what you need to know before a stakeholder opens a dashboard and finds it wrong. Tonight you write the queries that pull them, turn two of them into working monitors on a real table, and learn the shape of a monitor that a tired person at 07:00 will actually answer.</p>
+    <div class="chip-row">
+      <span class="chip level">🟢 Foundational</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip audience">Anyone who owns a table somebody else reads</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-21 · The signals you can already query</span>
+      <span class="a3" style="flex:4">21-40 · Build-along: two monitors</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>How the builder track works</h2>
+    </div>
+    <p class="lede">Eight sessions, 45 minutes each, one artifact: a <strong>monitor set</strong> on one real table, built signal by signal. Tonight the metadata queries and the first two monitors. Then freshness properly in session 2, volume and uniqueness in session 3, schema in session 4, distribution in session 5, expectations as code in session 6, lineage and blast radius in session 7, and in session 8 you run the whole set against 30 nights of history and count what it caught. The table throughout is <strong>orders_daily</strong> at Bellwether, a grocery delivery company whose warehouse has five real problems in it that nobody has noticed yet.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Four SQL snippets that work on any warehouse table you own, without installing anything. The reason a monitor is a query plus a threshold plus a named human, and useless if any one of the three is missing. And the number that decides whether the whole practice survives its first month: how many false pages a week a team tolerates before it stops reading the channel.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>Why start with metadata rather than the data<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Checking data means reading rows. Reading rows on a large table costs money and time, which is why the checks that read rows get run nightly at best and quietly disabled by the third invoice. Metadata is different: row counts, load timestamps, column lists and null counts are either already stored by the warehouse or computable in a single cheap aggregate. You can check them every 15 minutes without anybody noticing the bill.</p>
+        <p>That cost difference decides the shape of the practice. Metadata monitors are the layer that runs constantly and tells you <em>something moved</em>. Row-level tests are the layer that runs at build time and tells you <em>this specific rule broke</em>. You want both, and they are not substitutes.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's finance team found a broken revenue number on a Monday morning. The pipeline had not failed, so nothing alerted. One of three regional shards had stopped arriving on the Thursday before, and the table had been at 41 percent of a normal day's rows for two business days. A row count compared against the last four Thursdays would have flagged it before anybody was awake, and it costs one aggregate query to compute.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The vocabulary for the whole track<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <ul>
+          <li><strong>Signal</strong> - one measurable property of a table over time. Freshness, volume, schema, distribution and lineage are the five that carry the practice, and sessions 2 to 7 take one each.</li>
+          <li><strong>Monitor</strong> - a query, a threshold and a destination. Drop any one and you have a dashboard nobody reads.</li>
+          <li><strong>Data downtime</strong> - the hours in which a table was wrong, late or missing while people were using it. Detection time is the part you control.</li>
+          <li><strong>False page</strong> - an alert on a night when nothing was actually wrong. The currency you spend to buy detection, and the reason precision matters more than coverage.</li>
+          <li><strong>MTTD</strong> - mean time to detect, in hours, from the moment a table went wrong to the moment a human knew. Session 8 measures yours.</li>
+          <li><strong>Blast radius</strong> - everything downstream of a broken table: models, dashboards, exports, one reverse-ETL job into the CRM that nobody documented. Session 7.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the five signals and where each one comes from</span>
+      <h2>Four numbers, five signals</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">The five signals are not five separate technologies. Four of them come out of numbers your warehouse either stores for you or computes in one pass, and the fifth is a graph you build once and maintain. Knowing which is which tells you what you can have running by Friday and what needs a project.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One table on the left, four cheap metadata queries in the middle, and the five observability signals on the right. Freshness, volume, uniqueness and distribution come from single aggregate queries. Lineage comes from a graph built separately.">
+        <style>
+          .b1aT { font: 800 13px Inter, sans-serif; fill: #fff; }
+          .b1aH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b1aB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .b1aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b1aQ { font: 600 11px "SFMono-Regular", Menlo, monospace; fill: #082F44; }
+          .b1aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+        <defs>
+          <marker id="b1aAr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C3D4E0"></path>
+          </marker>
+        </defs>
+
+        <rect x="14" y="112" width="132" height="112" rx="12" fill="#075985"></rect>
+        <text class="b1aT" x="80" y="152" text-anchor="middle">orders_daily</text>
+        <text class="b1aB" x="80" y="172" text-anchor="middle" fill="#BAE6FD">one table</text>
+        <text class="b1aB" x="80" y="190" text-anchor="middle" fill="#BAE6FD">9 columns</text>
+        <text class="b1aB" x="80" y="208" text-anchor="middle" fill="#BAE6FD">12k rows a night</text>
+
+        <text class="b1aH" x="196" y="70">Cheap queries</text>
+        <text class="b1aM" x="196" y="88">one aggregate pass each</text>
+
+        <rect x="196" y="100" width="228" height="34" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b1aQ" x="208" y="122">max(updated_at)</text>
+        <rect x="196" y="142" width="228" height="34" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b1aQ" x="208" y="164">count(*)</text>
+        <rect x="196" y="184" width="228" height="34" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b1aQ" x="208" y="206">count(distinct order_id)</text>
+        <rect x="196" y="226" width="228" height="34" rx="8" fill="#F0F9FF" stroke="#BAE6FD"></rect>
+        <text class="b1aQ" x="208" y="248">count(*) - count(col)</text>
+
+        <line x1="150" y1="150" x2="192" y2="117" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="150" y1="166" x2="192" y2="159" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="150" y1="182" x2="192" y2="201" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="150" y1="198" x2="192" y2="243" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+
+        <text class="b1aH" x="486" y="70">The five signals</text>
+        <text class="b1aM" x="486" y="88">four are free, one is a project</text>
+
+        <rect x="486" y="100" width="176" height="34" rx="8" fill="#0369A1"></rect>
+        <text class="b1aT" x="574" y="122" text-anchor="middle">Freshness</text>
+        <rect x="486" y="142" width="176" height="34" rx="8" fill="#0369A1"></rect>
+        <text class="b1aT" x="574" y="164" text-anchor="middle">Volume</text>
+        <rect x="486" y="184" width="176" height="34" rx="8" fill="#0369A1"></rect>
+        <text class="b1aT" x="574" y="206" text-anchor="middle">Uniqueness</text>
+        <rect x="486" y="226" width="176" height="34" rx="8" fill="#0369A1"></rect>
+        <text class="b1aT" x="574" y="248" text-anchor="middle">Distribution</text>
+
+        <line x1="428" y1="117" x2="482" y2="117" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="428" y1="159" x2="482" y2="159" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="428" y1="201" x2="482" y2="201" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+        <line x1="428" y1="243" x2="482" y2="243" stroke="#C3D4E0" stroke-width="1.5" marker-end="url(#b1aAr)"></line>
+
+        <rect x="694" y="142" width="172" height="76" rx="10" fill="#38BDF8"></rect>
+        <text class="b1aH" x="780" y="170" text-anchor="middle">Schema</text>
+        <text class="b1aH" x="780" y="192" text-anchor="middle">+ Lineage</text>
+        <text class="b1aB" x="780" y="210" text-anchor="middle">a stored graph</text>
+
+        <text class="b1aM" x="694" y="240">information_schema</text>
+        <text class="b1aM" x="694" y="256">plus a parsed DAG</text>
+
+        <rect x="14" y="300" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b1aN" x="38" y="312">Four of the five signals need no new tooling at all. Only lineage needs something built.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - four cheap aggregates carry four of the five signals.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Freshness: the load timestamp, not the wall clock<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Freshness asks whether the data arrived when it was supposed to. The naive version compares <code class="mono">max(updated_at)</code> against the current time and fires if the gap is too large. It works, and it is where everybody starts, and session 2 shows why a fixed deadline is the wrong shape for the question.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select max(updated_at) as last_row,
+       datediff('minute', max(updated_at), current_timestamp) as staleness_min
+from analytics.orders_daily;
+        </div>
+        <p>Two traps worth knowing before you point this at anything real. A table that is rebuilt in full every night has an <code class="mono">updated_at</code> that jumps to now on every load, which tells you the job ran rather than whether the data is current: for those, timestamp the <em>source event</em>, not the row write. And a partition that arrives empty still updates the table's metadata in some warehouses, so a freshness check that passes on an empty load is measuring the pipeline's mood rather than the data.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Volume: count(*) is a time series, not a number<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A row count on its own means nothing. A row count next to the last four values of the same weekday means a great deal, because grocery orders on a Saturday are not grocery orders on a Tuesday and a band wide enough to hold both is too wide to catch a missing shard.</p>
+        <p>This is the single most common reason a volume monitor gets switched off: it was set as a fixed band, it fired every weekend, and by week three somebody muted it. Session 3 does the arithmetic properly. Tonight just record the number every night, because you cannot compare against history you never stored.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's weekend volume is about 45 percent of a weekday. A plus-or-minus 30 percent band around the weekday average fires on all eight weekend nights in a 30-night window. That is eight false pages to catch nothing, and it happens before you have caught your first real incident.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Uniqueness and null rate in one pass<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Duplicate rate and null rate are the two signals that catch the failures which leave the row count looking healthy. A merge key that changes upstream can double some rows and drop others, landing you within a percent of a normal night while every downstream sum is wrong.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select count(*) as rows,
+       count(distinct order_id) as keys,
+       1 - count(distinct order_id) / count(*)::float as dup_rate,
+       (count(*) - count(customer_id)) / count(*)::float as null_rate_customer
+from analytics.orders_daily
+where load_date = current_date;
+        </div>
+        <ul>
+          <li><strong>Duplicate rate</strong> beats a uniqueness test on a big table because it degrades gracefully. A hard uniqueness assertion either passes or fails the build; a rate tells you it went from 1 percent to 8 percent, which is the sentence you need in the incident channel.</li>
+          <li><strong>Null rate per column</strong> is worth storing for every column you care about, not just the key. The column that goes null is almost never the one you would have picked.</li>
+          <li><strong>Store the results</strong> in a small metrics table, one row per table per night. That table is the history every later session compares against, and if you start it tonight, session 8 has something real to read.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the anatomy of a monitor and the cost of a page</span>
+      <h2>A monitor is three things, and two of them are not code</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">The query is the easy third. What decides whether a monitor is worth having is the threshold you set and the person who has agreed to answer it. A query with no threshold is a chart. A threshold with no named human is a chart that changes colour.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The anatomy of a monitor shown as four stacked bars: a query, a threshold, a destination and an agreed action. A bracket underneath labels the four together as one monitor, and a note says a monitor missing any one of the four is not a monitor.">
+        <style>
+          .b1bH { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b1bL { font: 700 12px Inter, sans-serif; fill: #0C1B26; }
+          .b1bB { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b1bK { font: 800 13px Inter, sans-serif; fill: #075985; }
+          .b1bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .b1bR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+        </style>
+
+        <rect x="14" y="26" width="196" height="46" rx="9" fill="#075985"></rect>
+        <text class="b1bH" x="112" y="54" text-anchor="middle">1 · The query</text>
+        <text class="b1bL" x="228" y="46">What number, how often</text>
+        <text class="b1bB" x="228" y="64">count(*) every 15 minutes, stored with a timestamp</text>
+
+        <rect x="14" y="82" width="196" height="46" rx="9" fill="#0369A1"></rect>
+        <text class="b1bH" x="112" y="110" text-anchor="middle">2 · The threshold</text>
+        <text class="b1bL" x="228" y="102">When it counts as wrong</text>
+        <text class="b1bB" x="228" y="120">against history, not against a number somebody guessed once</text>
+
+        <rect x="14" y="138" width="196" height="46" rx="9" fill="#38BDF8"></rect>
+        <text class="b1bL" x="112" y="166" text-anchor="middle">3 · The destination</text>
+        <text class="b1bL" x="228" y="158">Which human, by name</text>
+        <text class="b1bB" x="228" y="176">a rota, not a channel called data-alerts that 40 people mute</text>
+
+        <rect x="14" y="194" width="196" height="46" rx="9" fill="#BAE6FD"></rect>
+        <text class="b1bL" x="112" y="222" text-anchor="middle">4 · The action</text>
+        <text class="b1bL" x="228" y="214">What they do at 07:00</text>
+        <text class="b1bB" x="228" y="232">hold the dashboard, or backfill, agreed in advance and written down</text>
+
+        <path d="M788,26 L804,26 L804,240 L788,240" fill="none" stroke="#B45309" stroke-width="2"></path>
+        <text class="b1bK" x="812" y="128">= one</text>
+        <text class="b1bK" x="812" y="146">monitor</text>
+
+        <rect x="14" y="266" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b1bN" x="38" y="278">Missing 3 or 4 is the usual failure. The query was never the hard part.</text>
+        <text class="b1bR" x="596" y="278">Most muted monitors died at step 3.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the query is one quarter of a monitor.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>The precision problem, in one number<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Every monitor buys detection with false pages. The exchange rate is the thing to watch, because a person who is woken for nothing twice in a week stops treating the channel as real, and from that point your monitors are decoration. There is no clean published threshold for where that happens, and the honest version is that it depends on the team and how the page arrives. What is not in doubt is the direction: alert fatigue is the documented failure mode of monitoring systems in software operations and in clinical settings alike, and the fix is always fewer, better alerts rather than more.</p>
+        <p>So the operating rule for the rest of this track: a monitor that fires more than about once a week without a real cause gets retuned or deleted. Not muted. Session 8 puts a number on what noise costs you, and the number is uncomfortable.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Where to put the check: warehouse, orchestrator or transform<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Three homes, three jobs, and picking the wrong one is why teams end up with the same check in two places disagreeing with itself.</p>
+        <table class="clean">
+          <thead>
+            <tr><th>Home</th><th>Runs when</th><th>Right for</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>A scheduled query in the warehouse</td><td>Every 15 to 60 minutes, independent of any pipeline</td><td>Freshness and volume on tables you do not build yourself</td></tr>
+            <tr><td>The orchestrator, as a task</td><td>Between pipeline steps</td><td>Gating: do not build the mart if the source is short</td></tr>
+            <tr><td>The transform project's own tests</td><td>At build time</td><td>Row-level rules about the data you produce</td></tr>
+          </tbody>
+        </table>
+        <p>The third one is a different discipline with its own tooling and its own course. What lives here is the layer that runs whether or not anybody's pipeline ran, because the most expensive incidents are the ones where nothing failed.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>Two monitors on orders_daily</h2>
+      <span class="tag demo">★ 19 min · everyone builds</span>
+    </div>
+    <p class="lede">Bring a table you own. If you have nothing to hand, use the numbers printed below, which are the real first nine nights of Bellwether's history. By the end of this you have a metrics table, a freshness monitor and a volume monitor, and you have set both thresholds from history rather than from a feeling.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>Create the metrics table first.</strong> One row per table per night. Everything in sessions 2 to 8 reads this, so the shape matters more than the checks do: <code class="mono">table_name, load_date, rows, distinct_keys, max_updated_at, late_minutes, null_rate_customer, column_count</code>. Nine columns, no nesting, one primary key of table plus date.</p>
+      </div>
+      <div class="step">
+        <p><strong>Backfill it if you can.</strong> If your warehouse keeps query history or partition metadata you can often reconstruct 30 nights of row counts in one statement. If it does not, start recording tonight and accept that your first thresholds are guesses until you have two weeks. Say that out loud to whoever asks why the monitor is not on yet.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the freshness monitor with a deadline you can defend.</strong> Bellwether promises the table by 06:00. Nights 1 to 8 landed 8, 14, 6, 19, 11, 22, 9 and 17 minutes past. Set the deadline at 30 minutes past and note what you just did: you picked a number that no clean night in your history exceeds. That is the whole method, and session 2 replaces it with something better.</p>
+      </div>
+      <div class="step">
+        <p><strong>Write the volume monitor against the same weekday.</strong> Nights 1 to 8 held 11,842 / 12,394 / 11,908 / 12,510 / 12,061 / 5,489 / 5,302 / 12,177 rows. Nights 6 and 7 are the weekend. Compare tonight against the median of the last four <em>same weekdays</em> and alert outside 25 percent. Now check what a plus-or-minus 30 percent band around 12,000 would have done to nights 6 and 7.</p>
+      </div>
+      <div class="step">
+        <p><strong>Name the human and write the action.</strong> Two sentences in the repo README: who is on the rota this week, and what they do when the page fires. If you cannot fill in the first sentence, you have built a chart. That is a fine thing to have built, and it is not a monitor.</p>
+      </div>
+      <div class="step">
+        <p><strong>Run night 9 through both.</strong> Night 9 landed 230 minutes past 06:00 with 12,004 rows. Which monitor fires, how long did it take, and what does the message say? Write the message you would actually want to receive, then compare it with what your tool would have sent.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>The message is part of the monitor.</strong> "orders_daily freshness alert" makes the reader go and look. "orders_daily landed 230 min after the 06:00 promise; trailing p95 is 22 min; 3 dashboards and the finance export read it" makes the reader act. Same query, same threshold, different Monday.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 2</h2>
+      <span class="tag exercise">25 min</span>
+    </div>
+    <ol>
+      <li>Get the metrics table recording nightly on <strong>one</strong> table. One table done properly beats twelve half-instrumented ones, and session 5 explains why tiering is the whole game.</li>
+      <li>Pull whatever history you can into it and plot lateness for the last 30 nights. Look at the shape: is it a tight cluster with a tail, or genuinely bimodal because two different jobs write this table?</li>
+      <li>Write down the deadline you would defend to a stakeholder and the evidence for it. One line each.</li>
+      <li>Find out who would answer a page about this table at 07:00 tomorrow. Actually ask them. This is the homework that fails most often, and it is the one that decides whether any of the rest works.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">A table is rebuilt in full every night. Why is <code class="mono">max(updated_at)</code> a poor freshness signal for it?</p>
+      <button class="qopt" type="button">A · Because full rebuilds are always slower than incremental loads</button>
+      <button class="qopt" type="button">B · Because it jumps to the current time on every load, so it reports that the job ran rather than whether the data is current</button>
+      <button class="qopt" type="button">C · Because rebuilt tables do not have an updated_at column</button>
+      <p class="qwhy">A row-write timestamp measures the write. If the source stopped producing events a week ago and the job still rebuilds nightly, the timestamp looks perfect. Timestamp the source event instead.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Bellwether's weekend volume is about 45 percent of a weekday. What does a fixed plus-or-minus 30 percent band around the weekday average do in a 30-night window?</p>
+      <button class="qopt" type="button">A · Catches the partial load two nights earlier than a weekday comparison</button>
+      <button class="qopt" type="button">B · Nothing, because 30 percent is wide enough to hold both patterns</button>
+      <button class="qopt" type="button">C · Fires on all eight weekend nights, spending eight false pages before catching anything real</button>
+      <p class="qwhy">45 percent is well outside a 30 percent band, so every weekend is an alert. This is the most common reason a volume monitor gets muted in its first month.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A monitor has a query and a threshold but no named person who has agreed to answer it. What have you built?</p>
+      <button class="qopt" type="button">A · A chart that changes colour, and the incident will still be reported by a stakeholder</button>
+      <button class="qopt" type="button">B · A monitor with a minor documentation gap</button>
+      <button class="qopt" type="button">C · A monitor that works until the first real incident</button>
+      <p class="qwhy">Detection is a human outcome, not a query result. An alert nobody owns changes the colour of a panel and nothing else, and the stakeholder still gets there first.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The five pillars of data observability</span>
+        <span class="note">All five named and sourced to where each one comes from. Sessions 2 to 7 take one each.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Warehouse metadata as a monitoring surface</span>
+        <span class="note">information_schema, load timestamps, aggregate counts. Working SQL for all four numbers.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">DAMA-DMBOK and ISO/IEC 25012 quality dimensions</span>
+        <span class="note">Named tonight, compared properly in leader session 3, which is where the choice of which dimensions to measure belongs.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Great Expectations, Soda and the expectations-as-code layer</span>
+        <span class="note">Session 6 builds it. Tonight is deliberately tool-free so the signals are separable from any vendor.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Row-level tests in a transform project</span>
+        <span class="note">Not covered by design. Build-time assertions on data you produce are a different discipline; that is what the analytics engineering track is for.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 1 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Five signals</b><span>Freshness, volume, uniqueness, distribution, lineage. Four are one aggregate query. Lineage is a graph you build.</span></div>
+      <div class="cheat-item"><b>Freshness</b><span>Timestamp the source event, not the row write. A full rebuild always looks fresh.</span></div>
+      <div class="cheat-item"><b>Volume</b><span>Compare against the last four same weekdays. A fixed band fires every weekend.</span></div>
+      <div class="cheat-item"><b>Duplicate rate</b><span>1 - distinct(key)/count(*). Catches the failures that leave the row count healthy.</span></div>
+      <div class="cheat-item"><b>A monitor</b><span>Query plus threshold plus named human plus agreed action. Three of the four are not code.</span></div>
+      <div class="cheat-item"><b>The metrics table</b><span>One row per table per night. Start it tonight; every later threshold reads it.</span></div>
+      <div class="cheat-item"><b>False pages</b><span>The currency you spend on detection. More than about one a week and the channel dies.</span></div>
+      <div class="cheat-item"><b>The message</b><span>Number, comparison, blast radius. "Freshness alert" makes them look; the numbers make them act.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 1 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="../index.html">← All sessions</a>
+      <a href="b2-freshness.html">Builder session 2 · Freshness →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- social:start -->
+<meta name="description" content="Builder session 5 of 8. Null rate, cardinality, min and max, and segment share: four shape statistics that need no rows read. The 3-sigma null-rate monitor, the night it earns its slot, and the night it pages for nothing.">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Learn with Phoebe">
+<meta property="og:title" content="Distribution drift from metadata only - learn data observability with phoebe">
+<meta property="og:description" content="Builder session 5 of 8. Four cheap shape statistics, a trailing 3-sigma monitor, and an honest line where metadata monitoring stops.">
+<meta property="og:url" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/courses/b5-distribution-drift.html">
+<meta property="og:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Distribution drift from metadata only - learn data observability with phoebe">
+<meta name="twitter:description" content="Four statistics, one aggregate pass, and the honest boundary where the statistics course takes over.">
+<meta name="twitter:image" content="https://phoebefu6.github.io/learn-data-observability-with-phoebe/assets/og-cover.png">
+<!-- social:end -->
+<title>Builder session 5 · Distribution drift from metadata only - learn data observability with phoebe</title>
+<link rel="stylesheet" href="../assets/style.css?v=1">
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="wrap">
+    <span class="crumb"><a href="../index.html">learn-data-observability-with-phoebe</a> / Builder session 5 of 8</span>
+    <button class="btn" id="toggle-all" type="button">Expand all</button>
+    <button class="btn primary" id="zoom-toggle" type="button">Projector zoom: off</button>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Learn Data Observability with Phoebe · Builder session 5 of 8</div>
+    <h1>Distribution drift from <span class="accent">metadata only</span></h1>
+    <p class="sub">Freshness, volume, uniqueness and schema all answer the question "did the load work". Distribution answers a harder one: the load worked, the counts are right, and the values are no longer the values they were. Four statistics get you a surprisingly long way into that question without reading a single row, and one of them catches the last defect in Bellwether's history. The same statistic also pages on a night when nothing happened, and both of those facts are taught here.</p>
+    <div class="chip-row">
+      <span class="chip level">🟠 Advanced</span>
+      <span class="chip audience">Analytics engineers</span>
+      <span class="chip time">45 min</span>
+    </div>
+    <div class="agenda">
+      <span class="a1" style="flex:1">0-3 · Welcome</span>
+      <span class="a2" style="flex:5">3-20 · How far you get without reading a row</span>
+      <span class="a3" style="flex:4">20-40 · Build-along: the null-rate monitor</span>
+      <span class="a4" style="flex:1">40-45 · Q&amp;A</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ INTRO ============ -->
+  <section class="section" id="intro">
+    <div class="section-kicker">
+      <span class="klabel">Part 0</span>
+      <h2>Where the monitor set stands</h2>
+    </div>
+    <p class="lede">The artifact so far: a metrics table on <strong>analytics.orders_daily</strong> at Bellwether recording one row per night, plus four monitors. Learned freshness, same-weekday volume, duplicate rate and the column-set diff. Four of the five nights that go wrong in the 30-night history are now caught, and one is not: night 25, when <code class="mono">customer_id</code> stops arriving for one order in nine. Tonight is the signal that sees it, and the point at which the cheap approach runs out. Session 6 wires the whole set into expectations as code, session 7 adds lineage, session 8 scores it.</p>
+
+    <div class="legend">
+      <span class="pill">Live = presented in the 45 minutes</span>
+      <span class="pill">Self-study = the full depth, after class</span>
+      <span class="pill">🔍 Every diagram zooms</span>
+    </div>
+
+    <div class="callout win">
+      <p><strong>★ What you walk out with tonight.</strong> Four aggregate statistics that describe the shape of a table without reading its rows, a trailing 3-sigma monitor in working SQL, and the two arithmetic reasons that monitor is fragile on a near-zero signal. Plus the sentence to say when somebody asks for anomaly detection on values: that is a different set of algorithms and here is the course that owns them.</p>
+    </div>
+
+    <details class="card" open>
+      <summary><span class="mode live">Live</span>What "distribution" means when you refuse to read rows<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Reading rows to compare distributions is a solved problem with well-understood tools: a two-sample test, a divergence between histograms, a drift score per column. All of them need the values, which means a full scan or a sample, which means a cost per column per night on every table you care about.</p>
+        <p>The metadata alternative is to describe the shape with a handful of numbers that a single aggregate pass produces anyway, and then watch those numbers over time. A null rate is not a distribution. Four numbers that each move when the distribution moves are close enough to catch the failures that matter, at a cost of one query per table per night, which is what makes it the layer that survives the second invoice.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>Bellwether's checkout team made a phone-number field optional in a release. Nothing failed. The order rows kept arriving, the counts stayed normal, and <code class="mono">customer_id</code> null rate went from 0.5 to 11.4 percent on night 25 because the same form change removed the account lookup for guest checkouts. Every customer-level aggregate downstream quietly dropped one order in nine, and the row count, the load time, the key uniqueness and the column list were all perfect.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Why distribution is the last signal to instrument<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>It is fifth in the order for a reason, and the reason is precision rather than difficulty. The null-rate query is easier than the same-weekday volume median. What makes it last is that a distribution statistic has no natural threshold: lateness has a promise, volume has a same-weekday history, uniqueness has a key. A null rate has only its own past, so every threshold is learned, and a learned threshold on a signal with almost no variance is the single most reliable way to manufacture false pages.</p>
+        <ul>
+          <li><strong>Instrument it last</strong> so you have at least two weeks of history to learn from before you switch on an alert.</li>
+          <li><strong>Record it from night one</strong> even so, because the history is the only thing that makes the threshold defensible later.</li>
+          <li><strong>Expect to tune it</strong> more than any other monitor in the set. This is the one where the first threshold is usually wrong.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 1 ============ -->
+  <section class="section" id="part-1">
+    <div class="section-kicker">
+      <span class="klabel">Part 1 · covers the four shape statistics and the 3-sigma rule</span>
+      <h2>Four cheap shape statistics</h2>
+      <span class="tag concept">9 min live</span>
+    </div>
+    <p class="lede">Each one is a single aggregate over the nightly partition, each one catches a failure class the other three miss, and each one has a characteristic false alarm that you will meet in its first fortnight. Knowing the false alarm in advance is what stops the monitor being muted before it earns anything.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 366" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four shape statistics as four lanes. Null rate per column catches a field going optional upstream and false-alarms on a near-zero baseline. Cardinality catches a fan-out join or a collapsed code list and false-alarms on a legitimate new product code. Min and max catch a bad date or a negative amount and false-alarm on a first large order. Segment share catches a category that stops arriving while the row count holds, and false-alarms on a marketing campaign shifting the channel mix.">
+        <style>
+          .b5aH { font: 800 11px Inter, sans-serif; fill: #55697A; }
+          .b5aT { font: 800 12px Inter, sans-serif; fill: #fff; }
+          .b5aTi { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b5aS { font: 400 10.5px Inter, sans-serif; fill: #fff; }
+          .b5aSi { font: 400 10.5px Inter, sans-serif; fill: #0C1B26; }
+          .b5aB { font: 400 11px Inter, sans-serif; fill: #0C1B26; }
+          .b5aR { font: 400 11px Inter, sans-serif; fill: #991B1B; }
+          .b5aM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b5aN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+        </style>
+
+        <text class="b5aM" x="14" y="24">Four statistics. One aggregate pass each. Not a row read between them.</text>
+
+        <text class="b5aH" x="14" y="52">STATISTIC</text>
+        <text class="b5aH" x="176" y="52">WHAT IT CATCHES</text>
+        <text class="b5aH" x="460" y="52">ITS CHARACTERISTIC FALSE ALARM</text>
+        <text class="b5aH" x="716" y="52">COST</text>
+
+        <rect x="14" y="64" width="150" height="54" rx="9" fill="#075985"></rect>
+        <text class="b5aT" x="28" y="86">Null rate</text>
+        <text class="b5aS" x="28" y="104">per column</text>
+        <text class="b5aB" x="176" y="92">A field goes optional upstream</text>
+        <text class="b5aR" x="460" y="84">A near-zero baseline trips</text>
+        <text class="b5aR" x="460" y="101">3 sigma on 0.3 points</text>
+        <text class="b5aM" x="716" y="92">one aggregate pass</text>
+
+        <rect x="14" y="124" width="150" height="54" rx="9" fill="#0369A1"></rect>
+        <text class="b5aT" x="28" y="146">Cardinality</text>
+        <text class="b5aS" x="28" y="164">distinct / count</text>
+        <text class="b5aB" x="176" y="152">A join fans out; a code list collapses</text>
+        <text class="b5aR" x="460" y="144">A legitimate new product</text>
+        <text class="b5aR" x="460" y="161">code lands overnight</text>
+        <text class="b5aM" x="716" y="144">count distinct: the</text>
+        <text class="b5aM" x="716" y="161">dearest of the four</text>
+
+        <rect x="14" y="184" width="150" height="54" rx="9" fill="#38BDF8"></rect>
+        <text class="b5aTi" x="28" y="206">Min and max</text>
+        <text class="b5aSi" x="28" y="224">per column</text>
+        <text class="b5aB" x="176" y="212">A bad date, a negative amount</text>
+        <text class="b5aR" x="460" y="204">The first order over 1,000</text>
+        <text class="b5aR" x="460" y="221">in a year</text>
+        <text class="b5aM" x="716" y="212">one aggregate pass</text>
+
+        <rect x="14" y="244" width="150" height="54" rx="9" fill="#BAE6FD"></rect>
+        <text class="b5aTi" x="28" y="266">Segment share</text>
+        <text class="b5aSi" x="28" y="284">by status, channel</text>
+        <text class="b5aB" x="176" y="272">A category stops arriving, rows hold</text>
+        <text class="b5aR" x="460" y="264">A campaign shifts the</text>
+        <text class="b5aR" x="460" y="281">channel mix for a week</text>
+        <text class="b5aM" x="716" y="272">one group by</text>
+
+        <rect x="14" y="326" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b5aN" x="38" y="338">Segment share is the underrated one: rows hold, a category vanishes.</text>
+        <text class="b5aM" x="14" y="358">Every false alarm above is a real change in the data. That is what makes them hard.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - four statistics, four failure classes, four false alarms to expect in week one.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Null rate per column<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it catches.</strong> A field that went optional upstream, an authentication or lookup step that stopped running, a join that started missing on the right side. Anything where the row still arrives but one of its values does not.</p>
+        <p><strong>What it costs.</strong> One aggregate pass for every column you name, all in the same query. On a nightly partition this is the cheapest statistic on the list.</p>
+        <p><strong>Its characteristic false alarm.</strong> The near-zero baseline. A column that is null 0.4 percent of the time has a trailing standard deviation measured in hundredths of a percentage point, so an ordinary night at 0.7 percent is more than three standard deviations out. This is night 8 in Bellwether's history and it is a page nobody wanted, covered properly in part 2.</p>
+        <p>The monitor itself is a trailing window with a sigma rule, computed exactly the way the bench in session 8 computes it: take the null rate for the last 14 nights, take their mean and standard deviation, and fire when tonight exceeds the mean plus three standard deviations.</p>
+        <div class="callout example">
+          <span class="ex-pill">Real world</span>
+          <p>On night 25 that rule produces <strong>"customer_id null rate 11.4 percent vs a trailing mean of 0.5"</strong>. That is the sentence that catches the fifth and last defect in the history, and no other monitor in the set sees the night at all: the load was on time, the row count was normal, the duplicate rate was at baseline and the column list was unchanged.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Cardinality: distinct over count<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it catches.</strong> Two opposite failures with one number. Cardinality collapsing means a code list shrank or a lookup started returning a default for everything, so 40 distinct <code class="mono">ship_region</code> values became 3. Cardinality exploding on a column that should be low means a join fanned out or a free-text field got pointed at the wrong source.</p>
+        <p><strong>What it costs.</strong> The most of the four. <code class="mono">count(distinct)</code> is a shuffle on most engines, and on a wide table with many columns it is the statistic that shows up on the bill. Approximate counting functions cut the cost hard and are accurate enough for a drift signal, which is the right trade here: you are watching a ratio move, not auditing a number.</p>
+        <p><strong>Its characteristic false alarm.</strong> A legitimate new category. Product codes, promo codes and region codes get added by the business without telling anybody, and cardinality is by design sensitive to exactly that. Watch the ratio rather than the raw count, and set the band wider than instinct suggests.</p>
+        <p>One thing worth separating: cardinality on a key column is not this statistic. That is the duplicate rate from session 3, it has a defensible absolute threshold, and it belongs in its own monitor.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Min and max per column<span class="mini">3 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it catches.</strong> The failures that a rate cannot see because they affect one row. A single order dated 1970 from a null-to-epoch conversion. A negative <code class="mono">amount</code> from a refund path that started writing to the orders table. A maximum that jumps by three orders of magnitude the night somebody changed a currency field from pounds to pence.</p>
+        <p><strong>What it costs.</strong> One aggregate pass, and it comes free alongside the null-rate query.</p>
+        <p><strong>Its characteristic false alarm.</strong> Genuine extremes. The first order over 1,000 pounds in a year is a real order, and a max-based monitor is right to notice and wrong to page. This is the statistic to log and chart rather than to alert on, with two exceptions worth an actual page: a value outside the physically possible range for the column, and a min or max that changes <em>type</em> of magnitude, such as a date before the company existed.</p>
+        <p>Store min and max for dates and amounts, alert only on the impossible, and read the chart weekly. That division is what stops this one becoming the monitor everybody mutes.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>Segment share, and the failure only it can see<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p><strong>What it catches.</strong> The proportion of rows in each value of a low-cardinality column: <code class="mono">status</code>, <code class="mono">channel</code>, <code class="mono">currency</code>. Its unique contribution is the failure where one category stops arriving entirely while the row count holds steady, because something else grew to fill the gap.</p>
+        <p><strong>What it costs.</strong> One <code class="mono">group by</code>, and the result is a handful of rows per night per column. Store it long and wide rather than as a single number, because the interesting version of the alert names the segment.</p>
+        <p><strong>Its characteristic false alarm.</strong> Real mix changes. A marketing push moves the app share from 30 to 45 percent in a week, which is a true change in the business and a false page about the data. The mitigation is a wider band plus a minimum absolute share, so a segment that was 2 percent and became 3 percent does not page.</p>
+        <ul>
+          <li><strong>A new category appearing</strong> is the case worth a separate rule. <code class="mono">status</code> gaining <code class="mono">held</code> is not a schema change, the column list is identical, and it is the exact failure that breaks every downstream case statement. Segment share is where that gets caught.</li>
+          <li><strong>A category disappearing</strong> is the mirror image and the more dangerous one, because a missing segment reads downstream as a genuine absence rather than as an error.</li>
+          <li><strong>Row count blindness</strong> is the reason it earns a slot. If mobile orders vanish and web orders grow by the same amount, volume is perfect, freshness is perfect, uniqueness is perfect, and every channel-split report in the estate is wrong.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ PART 2 ============ -->
+  <section class="section" id="part-2">
+    <div class="section-kicker">
+      <span class="klabel">Part 2 · covers the fragility of the 3-sigma rule and the boundary</span>
+      <h2>The limits, stated honestly</h2>
+      <span class="tag concept">8 min live</span>
+    </div>
+    <p class="lede">The null-rate monitor catches the last defect in the history and it also fires on night 8, when nothing happened. That page is not a bug in the query. It is what a three-standard-deviation rule does to a signal whose standard deviation is nearly zero, and it is worth walking through the arithmetic rather than waving at it.</p>
+
+    <figure class="zoomable">
+      <svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two panels of the same customer_id null-rate series over 30 nights. The top panel is scaled to 12 percent and shows night 25 as a single enormous spike at 11.4 percent against a flat baseline. The bottom panel is the same series zoomed to the first 0.9 percent, showing the trailing mean around 0.4 percent, the 3-sigma envelope just above it, and night 8 at 0.7 percent sitting barely outside that envelope.">
+        <style>
+          .b5bH { font: 800 12px Inter, sans-serif; fill: #0C1B26; }
+          .b5bM { font: 400 11px Inter, sans-serif; fill: #55697A; }
+          .b5bA { font: 400 10px Inter, sans-serif; fill: #55697A; }
+          .b5bR { font: 700 11px Inter, sans-serif; fill: #991B1B; }
+          .b5bN { font: 700 11px Inter, sans-serif; fill: #0C1B26; }
+          .b5bL { font: 700 10.5px Inter, sans-serif; fill: #075985; }
+        </style>
+
+        <text class="b5bH" x="14" y="24">customer_id null rate, 30 nights</text>
+        <text class="b5bM" x="14" y="42">Top: the real scale. Bottom: the same series zoomed to the first 0.9 percent.</text>
+
+        <line x1="62" y1="190" x2="830" y2="190" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="62" y1="146.7" x2="830" y2="146.7" stroke="#C3D4E0" stroke-width="0.75" stroke-dasharray="3 4"></line>
+        <line x1="62" y1="103.3" x2="830" y2="103.3" stroke="#C3D4E0" stroke-width="0.75" stroke-dasharray="3 4"></line>
+        <line x1="62" y1="60" x2="830" y2="60" stroke="#C3D4E0" stroke-width="0.75" stroke-dasharray="3 4"></line>
+        <text class="b5bA" x="20" y="193">0 pct</text>
+        <text class="b5bA" x="20" y="150">4 pct</text>
+        <text class="b5bA" x="20" y="107">8 pct</text>
+        <text class="b5bA" x="18" y="64">12 pct</text>
+
+        <polyline fill="none" stroke="#0369A1" stroke-width="2" points="62,186.8 87,184.5 112,186.6 137,186.4 162,185.1 187,185.2 212,186.6 237,182.8 262,184.6 287,185.5 312,183.8 337,186.4 362,186.6 387,183.1 412,185.3 437,184.6 462,184.9 487,186.5 512,184.6 537,183.6 562,183.6 587,185.0 612,184.6 637,187.2 662,66.5 687,184.9 712,184.0 737,185.6 762,183.7 787,187.7"></polyline>
+        <circle cx="662" cy="66.5" r="4.5" fill="#991B1B"></circle>
+        <text class="b5bR" x="600" y="52" text-anchor="middle">night 25 · 11.4 pct</text>
+        <text class="b5bM" x="600" y="92" text-anchor="middle">trailing mean 0.5</text>
+
+        <text class="b5bH" x="14" y="228">Zoomed to 0.9 percent</text>
+        <line x1="62" y1="350" x2="830" y2="350" stroke="#C3D4E0" stroke-width="1.5"></line>
+        <line x1="62" y1="240" x2="830" y2="240" stroke="#C3D4E0" stroke-width="0.75" stroke-dasharray="3 4"></line>
+        <text class="b5bA" x="20" y="353">0</text>
+        <text class="b5bA" x="14" y="243">0.9</text>
+
+        <polyline fill="none" stroke="#075985" stroke-width="1.75" stroke-dasharray="5 4" points="237,271.5 262,251.9 287,252.6 312,255.2 337,252.5 362,254.3 387,255.6 412,250.5 437,251.8 462,252.1 487,252.9 512,252.7 537,252.1 562,249.1 587,248.4 612,254.4 637,254.4 662,250.3"></polyline>
+        <polyline fill="none" stroke="#38BDF8" stroke-width="1.75" points="237,303.6 262,299.3 287,298.1 312,298.2 337,296.5 362,297.6 387,298.6 412,296.8 437,295.5 462,295.6 487,294.2 512,294.3 537,293.9 562,292.6 587,290.2 612,291.9 637,291.9 662,293.4"></polyline>
+        <polyline fill="none" stroke="#0369A1" stroke-width="2" points="62,314.4 87,287.5 112,311.6 137,309.9 162,294.6 187,295.8 212,311.8 237,268.8 262,288.9 287,298.8 312,279.9 337,309.0 362,311.2 387,272.6 412,296.7 437,288.9 462,292.5 487,310.9 512,288.9 537,278.3 562,277.4 587,293.2 612,288.9 637,318.7"></polyline>
+        <polyline fill="none" stroke="#0369A1" stroke-width="2" points="687,292.8 712,281.9 737,299.9 762,279.0 787,324.0"></polyline>
+        <line x1="662" y1="240" x2="662" y2="350" stroke="#991B1B" stroke-width="1" stroke-dasharray="3 3"></line>
+        <text class="b5bR" x="668" y="336">25 is off the top</text>
+
+        <circle cx="237" cy="268.8" r="4.5" fill="#991B1B"></circle>
+        <text class="b5bR" x="237" y="258" text-anchor="middle">night 8</text>
+        <text class="b5bL" x="700" y="252">3 sigma envelope</text>
+        <text class="b5bL" x="700" y="300">trailing mean</text>
+
+        <rect x="14" y="382" width="14" height="14" rx="3" fill="#B45309"></rect>
+        <text class="b5bN" x="38" y="394">Night 8 is 0.7 pct against a trailing mean of 0.4, and 3 sigma sat at 0.6.</text>
+        <text class="b5bR" x="14" y="414">One of these two pages is the catch. The other is a page nobody wanted.</text>
+      </svg>
+      <figcaption>🔍 Click to zoom - the same rule produces the best catch in the set and one of its two surviving false pages.</figcaption>
+    </figure>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Why 3 sigma is fragile on a near-zero signal<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>Night 8 in Bellwether's history is an ordinary night. <code class="mono">customer_id</code> null rate came in at <strong>0.7 percent against a trailing mean of 0.4 percent</strong>. Nothing changed upstream, nothing broke, and the monitor paged.</p>
+        <p>The arithmetic is not in dispute. The trailing nights sat between roughly 0.3 and 0.5 percent, so the standard deviation of that window is under a tenth of a percentage point, and three of those puts the alert line at about 0.6 percent. A night at 0.7 percent is genuinely outside it. The rule fired correctly on a difference of three hundredths of a percentage point, which is not a difference anybody in the business could act on.</p>
+        <p>That is the structural problem with a relative rule on a signal that barely moves: as variance goes to zero, any deviation at all becomes many sigma. Two fixes, both cheap, both with a stated cost:</p>
+        <ul>
+          <li><strong>A floor on the absolute change.</strong> Require the null rate to have moved by at least some number of percentage points, or to exceed some absolute level, before the sigma rule is allowed to fire. Two percentage points removes night 8 and keeps night 25. The cost is stated plainly: any real drift smaller than two points is now invisible, so a column creeping from 0.5 to 1.8 percent null over a month passes silently.</li>
+          <li><strong>A minimum-variance guard.</strong> Floor the standard deviation before you multiply it, at something like a quarter of a percentage point. This keeps the rule relative for signals that do vary and stops it becoming a hair trigger for signals that do not. The cost is a threshold you now have to justify per column rather than one rule for the table.</li>
+        </ul>
+        <p>A third option worth naming: require two consecutive nights outside the band. It halves the noise on wobbles and doubles the detection time on real drift, which on a nightly table is 24 extra hours of a wrong number in front of people.</p>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode live">Live</span>Where metadata monitoring stops<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>The moment you write "trailing mean plus three standard deviations" you have crossed into statistical anomaly detection, and you have done it with the weakest possible detector: a global rule, no seasonality, no trend term, no robustness to the outlier that poisons your own window. It works, it catches an 11.4 percent jump on a 0.5 percent baseline, and it should not be mistaken for the state of the art.</p>
+        <p>The algorithms that do this properly are a body of work in their own right, and they belong to <code class="mono">learn-anomaly-detection-with-phoebe</code>: rolling and seasonal decomposition detectors that model the weekly shape instead of averaging it away, robust statistics that a single spike cannot capture, isolation forest and other one-class methods for the multivariate case where no single column looks wrong but the combination does, and the evaluation apparatus for choosing between them.</p>
+        <p>The line between the two is worth stating as a working rule. Metadata monitoring owns the statistics that fall out of a load: rates, counts, extremes and shares, watched with rules simple enough that anybody on the rota can read the alert and understand why it fired. Statistical detection owns the models that need training, tuning, seasonality and their own validation. Reach for the second only when the first has been running long enough to show you which columns actually move.</p>
+        <div class="callout tip">
+          <p><strong>The order matters more than the choice.</strong> A team that starts with a learned detector on an uninstrumented table has no history to train on, no idea which columns are volatile and no baseline to compare the detector against. Four cheap statistics recorded nightly for a month is the dataset that makes the sophisticated version possible.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary><span class="mode self">Self-study</span>The spike that poisons its own window<span class="mini">4 min</span><span class="caret">▶</span></summary>
+      <div class="body">
+        <p>A detail the arithmetic produces that is easy to miss and expensive in practice. After night 25 comes into the trailing window, the mean and the standard deviation of that window are computed over a set that contains an 11.4 percent value alongside a dozen values near 0.5. The standard deviation jumps by a factor of roughly 25, and the alert line for the following two weeks sits around 10 percent.</p>
+        <p>So the fortnight immediately after an incident is the fortnight in which the monitor is least able to see the next one. A null rate creeping to 5 percent on night 27 would pass without comment. This is the opposite of what anybody wants from a monitor and it is a direct consequence of using a mean and a standard deviation over a raw window.</p>
+        <ul>
+          <li><strong>Exclude known incident nights</strong> from the trailing window. This requires a table of incident dates, which you should be keeping anyway for the scoring in session 8.</li>
+          <li><strong>Use a median and a median absolute deviation</strong> instead of a mean and a standard deviation. A single spike moves a median almost not at all, which is the same argument session 3 made for volume bands.</li>
+          <li><strong>Winsorise the window</strong> by clipping the top and bottom value before computing. Crude, effective, and one extra clause.</li>
+        </ul>
+        <p>Robust statistics are the right default for every trailing threshold in the set, and the reason this session uses the mean and standard deviation version is that it is what the bench in session 8 evaluates, so the false page on night 8 is a number you can reproduce rather than a claim.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ DEMO ============ -->
+  <section class="section" id="demo-1">
+    <div class="section-kicker">
+      <span class="klabel">Build-along</span>
+      <h2>The null-rate monitor and its limits</h2>
+      <span class="tag demo">★ 20 min · everyone builds</span>
+    </div>
+    <p class="lede">Six steps. Three build the monitor, two run it against the night it earns its slot and the night it does not, and the last one is the one to write down: what your fix just cost you in sensitivity.</p>
+
+    <div class="steps">
+      <div class="step">
+        <p><strong>1 · Compute the null rate for the columns you care about.</strong> One pass, one row per night, one column per statistic. Name the columns explicitly rather than looping over all nine, because the list of columns that matter is shorter than the table and it is a decision worth making on purpose.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select current_date as load_date,
+       'analytics.orders_daily' as table_name,
+       count(*) as rows,
+       (count(*) - count(customer_id))  / count(*)::float as null_rate_customer_id,
+       (count(*) - count(amount))       / count(*)::float as null_rate_amount,
+       (count(*) - count(ship_region))  / count(*)::float as null_rate_ship_region,
+       (count(*) - count(channel))      / count(*)::float as null_rate_channel
+from analytics.orders_daily
+where load_date = current_date;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>2 · Compute the trailing mean and standard deviation with a window function.</strong> Fourteen nights, excluding tonight. The <code class="mono">rows between 14 preceding and 1 preceding</code> frame is the whole trick, and getting the <code class="mono">1 preceding</code> right matters: include tonight in its own baseline and a real jump partially hides itself.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+select load_date,
+       null_rate_customer_id as rate,
+       avg(null_rate_customer_id) over (
+         order by load_date rows between 14 preceding and 1 preceding
+       ) as trailing_mean,
+       stddev_samp(null_rate_customer_id) over (
+         order by load_date rows between 14 preceding and 1 preceding
+       ) as trailing_sd,
+       count(*) over (
+         order by load_date rows between 14 preceding and 1 preceding
+       ) as n_history
+from analytics.metrics_daily
+where table_name = 'analytics.orders_daily'
+order by load_date;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>3 · Wrap it in the 3-sigma monitor.</strong> Fire when tonight exceeds the trailing mean plus three trailing standard deviations, and refuse to fire at all until you have at least seven nights of history, because a standard deviation over three nights is a random number wearing a lab coat.</p>
+        <div class="prompt-box good">
+          <span class="label">★ Try it now</span>
+with s as ( /* the query from step 2 */ )
+select load_date,
+       round(rate * 100, 1)          as rate_pct,
+       round(trailing_mean * 100, 1) as mean_pct,
+       round(trailing_sd * 100, 3)   as sd_pct,
+       'customer_id null rate ' || round(rate * 100, 1) ||
+       ' percent vs a trailing mean of ' || round(trailing_mean * 100, 1) as page_text
+from s
+where n_history &gt;= 7
+  and rate &gt; trailing_mean + 3 * trailing_sd
+order by load_date;
+        </div>
+      </div>
+      <div class="step">
+        <p><strong>4 · Run it against night 25.</strong> The rate is 11.4 percent, the trailing mean is 0.5 percent, and the page reads <strong>"customer_id null rate 11.4 percent vs a trailing mean of 0.5"</strong>. Check every other monitor in your set against the same night: freshness, volume, uniqueness and the column-set diff all pass. This is the defect that only this signal sees, and it is the fifth of five.</p>
+      </div>
+      <div class="step">
+        <p><strong>5 · Now run it against night 8.</strong> The rate is 0.7 percent, the trailing mean is 0.4 percent, and the standard deviation of that window is under a tenth of a point, so three sigma sits at about 0.6 and the monitor fires. Nothing happened on night 8. Print the trailing window alongside the alert and look at the numbers: this is what a correct query firing on a meaningless difference looks like, and you need to recognise it in your own data.</p>
+      </div>
+      <div class="step">
+        <p><strong>6 · Add a floor, count the survivors, and write down the cost.</strong> Add one clause: <code class="mono">and rate - trailing_mean &gt; 0.02</code>, a two-percentage-point floor on the absolute change. Re-run over all 30 nights and count. Night 25 survives, night 8 does not, so of the two pages the monitor produced you have kept exactly the one you wanted. Then write the cost in the README in one sentence: any real drift under two percentage points is now invisible on this column, so a slow creep from 0.5 to 2.0 percent null will never page. Try the alternative too, flooring the standard deviation at 0.25 percentage points, and see which of the two you would defend to whoever owns the dashboard.</p>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <p><strong>Write the floor down where the threshold lives, not in a commit message.</strong> A sensitivity floor is invisible in the query's behaviour on a normal night and it is the first thing anybody needs to know during the incident it failed to catch. One comment line next to the number, and one sentence in the README.</p>
+    </div>
+  </section>
+
+  <!-- ============ HOMEWORK ============ -->
+  <section class="section" id="exercise">
+    <div class="section-kicker">
+      <span class="klabel">Homework</span>
+      <h2>Before session 6</h2>
+      <span class="tag exercise">30 min</span>
+    </div>
+    <ol>
+      <li>Add all four statistics to the nightly metrics row for one table: null rate for the columns that matter, cardinality ratio for one or two, min and max for your date and amount columns, and segment share for one low-cardinality column. Record them all, alert on one.</li>
+      <li>Plot 30 nights of the null rate for your three most-read columns and look at the variance rather than the level. The column with almost no variance is the one that will page for nothing, and you can identify it before it does.</li>
+      <li>Pick a floor or a minimum-variance guard for that column and write the sensitivity cost next to it in one sentence. If you cannot write the cost, you have not chosen a threshold, you have chosen a number.</li>
+      <li>Find the low-cardinality column on your table where a segment disappearing would be invisible to every other monitor you have. That column is the argument for segment share, and it is usually <code class="mono">status</code> or a channel field.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="section" id="quiz">
+    <div class="section-kicker">
+      <span class="klabel">Check yourself</span>
+      <h2>Three questions</h2>
+    </div>
+
+    <div class="quiz-q" data-answer="2">
+      <p class="qtext">Night 8 has a null rate of 0.7 percent against a trailing mean of 0.4 percent, and the 3-sigma monitor pages. Why?</p>
+      <button class="qopt" type="button">A · The query has an off-by-one error in the trailing window frame</button>
+      <button class="qopt" type="button">B · A null rate above half a percent is an incident on any column</button>
+      <button class="qopt" type="button">C · The trailing standard deviation is under a tenth of a point, so three of them puts the line at about 0.6 percent and 0.7 is outside it</button>
+      <p class="qwhy">The arithmetic is correct and the page is still worthless. As variance approaches zero, any deviation becomes many sigma, which is why a relative rule on a near-flat signal needs either an absolute floor on the change or a minimum-variance guard.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="1">
+      <p class="qtext">Mobile orders stop arriving overnight and web orders grow by the same number of rows. Which of the four statistics sees it?</p>
+      <button class="qopt" type="button">A · Min and max, because the extremes of the amount column shift</button>
+      <button class="qopt" type="button">B · Segment share, because the proportion in each channel value moves while the total holds</button>
+      <button class="qopt" type="button">C · Null rate, because the missing channel arrives as null</button>
+      <p class="qwhy">The row count is unchanged, nothing is null and no extreme moved, so volume, freshness, uniqueness, null rate and min and max all pass. Only the proportion per category moved, which is what makes segment share the most underrated of the four.</p>
+    </div>
+
+    <div class="quiz-q" data-answer="0">
+      <p class="qtext">A stakeholder asks for seasonal decomposition and an isolation forest on the values in <code class="mono">amount</code>. Where does that work belong?</p>
+      <button class="qopt" type="button">A · With the statistical and ML detectors in <code class="mono">learn-anomaly-detection-with-phoebe</code>, once you have a month of recorded statistics to train and evaluate against</button>
+      <button class="qopt" type="button">B · In the null-rate monitor, by raising the sigma multiplier</button>
+      <button class="qopt" type="button">C · In the column-set diff, extended to compare value distributions</button>
+      <p class="qwhy">Rolling and seasonal detectors, isolation forest and one-class methods are a body of work with their own tuning and evaluation. The metadata layer stops at statistics that fall out of a load, watched with rules the rota can read, and it is also the layer that produces the history those models need.</p>
+    </div>
+
+    <p class="quiz-score"></p>
+  </section>
+
+  <!-- ============ COVERAGE ============ -->
+  <section class="section" id="official">
+    <div class="section-kicker">
+      <span class="klabel">Sources covered</span>
+      <h2>What tonight maps to</h2>
+    </div>
+    <div class="covered">
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Four metadata shape statistics</span>
+        <span class="note">Null rate per column, cardinality as distinct over count, min and max, and segment share. What each catches, what each costs, and the false alarm each one produces in its first fortnight.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The trailing 3-sigma null-rate monitor</span>
+        <span class="note">Built in SQL exactly as the session 8 bench computes it: 14 nights, mean plus three standard deviations, minimum seven nights of history. Catches night 25 at 11.4 percent against a trailing mean of 0.5.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">The fragility of a relative rule on a near-zero signal</span>
+        <span class="note">Night 8 at 0.7 percent against 0.4, real arithmetic and an unwanted page. Both fixes built and both costs stated, plus the spike that poisons its own trailing window.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill solid">✓</span>
+        <span class="name">Distribution as one of the five signals</span>
+        <span class="note">Handled with metadata only, which is the constraint that keeps the layer cheap enough to run on every table rather than on the three that got budget.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">Statistical and ML anomaly detection</span>
+        <span class="note">Rolling and seasonal detectors, robust statistics, isolation forest and one-class methods are named and handed to <code class="mono">learn-anomaly-detection-with-phoebe</code>, which owns the algorithms and their evaluation.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill light">◐</span>
+        <span class="name">A new code value breaking a downstream case statement</span>
+        <span class="note">Caught here by segment share rather than by the column-set diff, because the column list and the types are unchanged. Session 4 names it as the member of the silent class that is not a schema change at all.</span>
+      </div>
+      <div class="covered-row">
+        <span class="status pill inkpill">·</span>
+        <span class="name">Row-level value rules such as accepted-values assertions</span>
+        <span class="note">Not covered here. A build-time assertion on the values you produce yourself belongs to the transform project's own tests, which is what the analytics engineering track is for.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <section class="cheat" id="cheatsheet">
+    <h3>Session 5 cheat sheet</h3>
+    <div class="grid-2">
+      <div class="cheat-item"><b>Four statistics</b><span>Null rate, cardinality ratio, min and max, segment share. One aggregate pass, no rows read.</span></div>
+      <div class="cheat-item"><b>The monitor</b><span>Trailing 14 nights, fire above mean plus 3 sd, refuse to fire under 7 nights of history.</span></div>
+      <div class="cheat-item"><b>What it catches</b><span>Night 25: customer_id null rate 11.4 percent vs a trailing mean of 0.5. Nothing else in the set sees it.</span></div>
+      <div class="cheat-item"><b>What it costs</b><span>Night 8: 0.7 percent against 0.4. Correct arithmetic, unwanted page, three hundredths of a point.</span></div>
+      <div class="cheat-item"><b>Two fixes</b><span>An absolute floor on the change, or a minimum-variance guard. Write the sensitivity cost next to whichever you pick.</span></div>
+      <div class="cheat-item"><b>Segment share is underrated</b><span>The only one that sees a category stop arriving while the row count holds steady.</span></div>
+      <div class="cheat-item"><b>Min and max: log, do not page</b><span>Alert only on the physically impossible. Genuine extremes are real data.</span></div>
+      <div class="cheat-item"><b>The boundary</b><span>Rolling and seasonal detectors, isolation forest, one-class methods: <code class="mono">learn-anomaly-detection-with-phoebe</code>.</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pagefoot">
+  <div class="wrap">
+    <p>Builder session 5 of 8 · learn-data-observability-with-phoebe · by Phoebe Fu</p>
+    <nav class="pagenav">
+      <a href="b4-schema-change.html">← Builder session 4 · Schema change</a>
+      <a href="b6-expectations-as-code.html">Builder session 6 · Expectations as code →</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/app.js?v=1"></script>
+</body>
+</html>
